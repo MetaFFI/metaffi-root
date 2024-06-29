@@ -129,12 +129,18 @@ class CompilerEnvVarOptions:
 			raise ValueError(f"Unknown compiler: {self.cpp_compiler}")
 
 	def set_include_directories(self, dirs: list):
+		if isinstance(dirs, str):
+			dirs = [dirs]
 		self.env_vars.setdefault('CPPPATH', []).extend(dirs)  # Append to CPPPATH
 
 	def set_lib_directories(self, dirs: list):
+		if isinstance(dirs, str):
+			dirs = [dirs]
 		self.env_vars.setdefault('LIBPATH', []).extend(dirs)  # Append to LIBPATH
 
 	def add_library(self, lib: List[str]):
+		if isinstance(lib, str):
+			lib = [lib]
 		self.env_vars.setdefault('LIBS', []).extend(lib)
 
 	def set_cpp_standard(self, version: int):
@@ -156,7 +162,9 @@ class CompilerEnvVarOptions:
 			self.env_vars.setdefault('CXXFLAGS', []).append("-g")
 		elif self.cpp_compiler == Compiler.CL:
 			# Add debug-specific options
-			self.env_vars.setdefault('CXXFLAGS', []).append("/Zi")
+			self.env_vars.setdefault('CXXFLAGS', []).extend(["/Zi", "/EHsc", "/MD"])
+			self.env_vars.setdefault('CCFLAGS', []).extend(["/Zi", "/MD"])
+			self.env_vars.setdefault('LINKFLAGS', []).append("/DEBUG")
 		else:
 			raise ValueError(f"Unknown compiler: {self.cpp_compiler}")
 
@@ -203,7 +211,7 @@ class CompilerEnvVarOptions:
 		self.env_vars['BASE_OUTPUT_DIR'] = self.env_vars.Dir(f'#/output/{platform.system()}/{arch}/{project_name}/').abspath
 		self.env_vars['OUTPUT_BIN'] = self.env_vars.Dir(self.env_vars['BASE_OUTPUT_DIR']+'/bin/').File(target).abspath
 		self.env_vars['OBJPREFIX'] = self.env_vars.Dir(self.env_vars['BASE_OUTPUT_DIR']+'/obj/').abspath + '/'
-		self.env_vars['LIBPREFIX'] = self.env_vars.Dir(self.env_vars['BASE_OUTPUT_DIR']+'/lib/').abspath + '/'
+		# self.env_vars['LIBPREFIX'] = self.env_vars.Dir(self.env_vars['BASE_OUTPUT_DIR']+'/lib/').abspath + '/'
 
 
 def default_debug_compiler_options(env: SCons.Environment.Environment) -> CompilerEnvVarOptions:

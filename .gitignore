@@ -22,3 +22,5 @@ MetaFFI.code-workspace
 vc140.pdb
 
 site_scons/__pycache__/
+
+metaffi-installer/
