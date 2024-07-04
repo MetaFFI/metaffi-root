@@ -24,3 +24,6 @@ vc140.pdb
 site_scons/__pycache__/
 
 metaffi_installer.py
+containers/
+
+metaffi-installer/
