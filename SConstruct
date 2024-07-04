@@ -125,7 +125,7 @@ if not verify_project_exist(sconstruct_dir + '/lang-plugin-openjdk',
 	print('Failed to clone lang-plugin-openjdk. Exiting...', file=sys.stderr)
 	env.Exit(1)
 
-if not verify_project_exist(sconstruct_dir + '/dev-container', 'https://github.com/MetaFFI/dev-container.git'):
+if not verify_project_exist(sconstruct_dir + '/containers', 'https://github.com/MetaFFI/containers.git'):
 	print('Failed to clone dev-container. Exiting...', file=sys.stderr)
 	env.Exit(1)
 
@@ -214,6 +214,7 @@ def print_aliases(env):
 		(ALIAS_PYTHON3_ALL, "Builds, runs unit tests and API tests for Python3 plugin", Fore.LIGHTRED_EX),
 		(ALIAS_GO_ALL, "Builds, runs unit tests and API tests for Go plugin", Fore.LIGHTRED_EX),
 		(ALIAS_OPENJDK_ALL, "Builds, runs unit tests and API tests for OpenJDK plugin", Fore.LIGHTRED_EX),
+		(ALIAS_BUILD_INSTALLER, 'Builds MetaFFI installer', Fore.CYAN+Style.DIM),
 		(ALIAS_PYTHON3_PUBLISH_API, 'Publish MetaFFI Python3 API library to PyPI', Fore.CYAN+Style.DIM),
 	]
 
