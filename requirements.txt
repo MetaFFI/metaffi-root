@@ -1,0 +1,8 @@
+scons
+regex
+GitPython
+colorama
+
+conan
+
+# for tests

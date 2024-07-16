@@ -14,6 +14,8 @@ import re
 
 from site_scons import *
 from site_scons.environment_custom_methods import IsWindows
+from site_scons.environment_custom_methods import __set_go_env
+
 
 # * ---- Colorize Scons output ----
 class ColorizedStdoutWrapper(object):
@@ -86,7 +88,7 @@ environment_custom_methods.add_custom_methods(env)
 is_found, err_msg = environment_custom_methods.verify_metaffi_home()
 if not is_found:
 	print(err_msg, file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 # * ---- Make sure that all the MetaFFI projects exist. If not, clone them. ----
 
@@ -109,34 +111,34 @@ def verify_project_exist(path, url) -> bool:
 sconstruct_dir = env.Dir('#').abspath
 if not verify_project_exist(sconstruct_dir + '/metaffi-core', 'https://github.com/MetaFFI/metaffi-core.git'):
 	print('Failed to clone metaffi-core. Exiting...', file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 if not verify_project_exist(sconstruct_dir + '/lang-plugin-python3',
 							'https://github.com/MetaFFI/lang-plugin-python3.git'):
 	print('Failed to clone lang-plugin-python3. Exiting...', file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 if not verify_project_exist(sconstruct_dir + '/lang-plugin-go', 'https://github.com/MetaFFI/lang-plugin-go.git'):
 	print('Failed to clone lang-plugin-go. Exiting...', file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 if not verify_project_exist(sconstruct_dir + '/lang-plugin-openjdk',
 							'https://github.com/MetaFFI/lang-plugin-openjdk.git'):
 	print('Failed to clone lang-plugin-openjdk. Exiting...', file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 if not verify_project_exist(sconstruct_dir + '/containers', 'https://github.com/MetaFFI/containers.git'):
 	print('Failed to clone dev-container. Exiting...', file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 if not verify_project_exist(sconstruct_dir + '/metaffi-installer', 'https://github.com/MetaFFI/metaffi-installer.git'):
 	print('Failed to clone metaffi-installer. Exiting...', file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 # * verify conan package manager exists
 if not env.WhereWithError('conan'):
 	print('Conan package manager is not installed. Install using "pip install conan" Exiting...', file=sys.stderr)
-	env.Exit(1)
+	sys.exit(1)
 
 # * METAFFI_HOME will also be a global lib search path in build environment
 env.setdefault('LIBPATH', []).extend([env['METAFFI_HOME'],
@@ -154,6 +156,13 @@ elif 'release_debug_info' in SCons.Script.COMMAND_LINE_TARGETS:
 	env['BUILD_TYPE'] = 'release_debug_info'
 else:
 	env['BUILD_TYPE'] = 'debug'
+
+
+# * set Go environment variable if they don't exist
+__set_go_env(env, 'GOPATH')
+__set_go_env(env, 'GOCACHE')
+__set_go_env(env, 'GOROOT')
+
 
 
 # * --- Command line options ---

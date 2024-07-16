@@ -82,20 +82,30 @@ class CompilerEnvVarOptions:
 
 	def set_warning_level(self, level: int):
 		if self.cpp_compiler in (Compiler.GCC, Compiler.CLANG, Compiler.CLCLANG):
-			self.env_vars.setdefault('CXXFLAGS', []).append(f"-W{level}")
+			gcc_clang_warning_options = {
+				1: ["-Wall"],
+				2: ["-Wall", "-Wextra"],
+				3: ["-Wall", "-Wextra", "-pedantic"],
+				4: ["-Wall", "-Wextra", "-pedantic"]
+			}
+			options = gcc_clang_warning_options.get(level, ["-Wall"])
+			for option in options:
+				self.env_vars.setdefault('CXXFLAGS', []).append(option)
 		elif self.cpp_compiler == Compiler.CL:
 			cl_warning_options = {
-				1: "/W1",
-				2: "/W2",
-				3: "/W3",
-				4: "/W4"
+				1: ["/W1"],
+				2: ["/W2"],
+				3: ["/W3"],
+				4: ["/W4"]
 			}
-			self.env_vars.setdefault('CXXFLAGS', []).append(cl_warning_options.get(level, "/W3"))
+			options = cl_warning_options.get(level, ["/W3"])
+			for option in options:
+				self.env_vars.setdefault('CXXFLAGS', []).append(option)
 		else:
 			raise ValueError(f"Unknown compiler: {self.cpp_compiler}")
 
 	def use_pic(self):
-		if self.cpp_compiler in (Compiler.GCC):
+		if self.cpp_compiler ==Compiler.GCC:
 			self.env_vars.setdefault('CXXFLAGS', []).append("-fPIC")
 		elif self.cpp_compiler == Compiler.CLANG or self.cpp_compiler == Compiler.CLCLANG:
 			# CLANG doesn't have an equivalent for -fPIC; omit it for CLANG
@@ -141,7 +151,33 @@ class CompilerEnvVarOptions:
 	def add_library(self, lib: List[str]):
 		if isinstance(lib, str):
 			lib = [lib]
-		self.env_vars.setdefault('LIBS', []).extend(lib)
+
+		if self.cpp_compiler == Compiler.CL:
+			self.env_vars.setdefault('LIBS', []).extend(lib)
+		else:
+			for element in lib:
+				if not os.path.isabs(element):
+					if element.startswith('-l:'):
+						# library doesn't start with "lib" or end with ".a" or ".so"
+						# so remove -l: and use LINKFLAGS      
+						element = element[3:]
+						_, ext = os.path.splitext(element)
+      
+						self.env_vars.setdefault('LIBS', []).append('-l:'+element+ext)
+					else:
+						self.env_vars.setdefault('LIBS', []).append(element)
+				else:
+					if element.startswith('-l:'):
+						# library doesn't start with "lib" or end with ".a" or ".so"
+						# so remove -l: and use LINKFLAGS
+						element = element[3:]
+						_, ext = os.path.splitext(element)
+						self.env_vars.setdefault('LIBS', []).append('-l:'+os.path.basename(element+ext))
+						self.env_vars.setdefault('LIBPATH', []).append(os.path.dirname(element))
+					else:
+						self.env_vars.setdefault('LIBS', []).append(os.path.basename(element))
+						self.env_vars.setdefault('LIBPATH', []).append(os.path.dirname(element))
+		
 
 	def set_cpp_standard(self, version: int):
 		if self.cpp_compiler == Compiler.GCC:
@@ -208,10 +244,23 @@ class CompilerEnvVarOptions:
 	def set_output_directories(self, project_name: str, target: str):
 		# the directory is #/output/[operating_system]/[architecture]/[target]
 		arch = self.env_vars["architecture"]
-		self.env_vars['BASE_OUTPUT_DIR'] = self.env_vars.Dir(f'#/output/{platform.system()}/{arch}/{project_name}/').abspath
+  
+		if arch in ["x86_64", "AMD64"]:
+			arch = "x64"
+   
+		os_name = platform.system()
+   
+		if os_name == 'Linux':
+			import distro
+			os_name = distro.id()
+  
+		self.env_vars['BASE_OUTPUT_DIR'] = self.env_vars.Dir(f'#/output/{os_name}/{arch}/{project_name}/').abspath
 		self.env_vars['OUTPUT_BIN'] = self.env_vars.Dir(self.env_vars['BASE_OUTPUT_DIR']+'/bin/').File(target).abspath
 		self.env_vars['OBJPREFIX'] = self.env_vars.Dir(self.env_vars['BASE_OUTPUT_DIR']+'/obj/').abspath + '/'
 		# self.env_vars['LIBPREFIX'] = self.env_vars.Dir(self.env_vars['BASE_OUTPUT_DIR']+'/lib/').abspath + '/'
+
+	def set_shared_object_prefix(self, prefix: str):
+		self.env_vars['SHLIBPREFIX'] = prefix
 
 
 def default_debug_compiler_options(env: SCons.Environment.Environment) -> CompilerEnvVarOptions:
@@ -222,6 +271,7 @@ def default_debug_compiler_options(env: SCons.Environment.Environment) -> Compil
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_debug()
+		compiler_options.set_shared_object_prefix('')
 
 	elif platform.system() == 'Linux':
 		# Set the default compiler to GCC
@@ -231,6 +281,7 @@ def default_debug_compiler_options(env: SCons.Environment.Environment) -> Compil
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_debug()
+		compiler_options.set_shared_object_prefix('')
 
 	elif platform.system() == 'Darwin':
 		# Set the default compiler to CLANG
@@ -240,6 +291,7 @@ def default_debug_compiler_options(env: SCons.Environment.Environment) -> Compil
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_debug()
+		compiler_options.set_shared_object_prefix('')
 
 	else:
 		# unsupported platform
@@ -256,6 +308,7 @@ def default_release_compiler_options(env: SCons.Environment.Environment) -> Comp
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_release()
+		compiler_options.set_shared_object_prefix('')
 	elif platform.system() == 'Linux':
 		# Set the default compiler to GCC
 		compiler_options = CompilerEnvVarOptions(Compiler.GCC, env)
@@ -264,6 +317,7 @@ def default_release_compiler_options(env: SCons.Environment.Environment) -> Comp
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_release()
+		compiler_options.set_shared_object_prefix('')
 	elif platform.system() == 'Darwin':
 		# Set the default compiler to CLANG
 		compiler_options = CompilerEnvVarOptions(Compiler.CLANG, env)
@@ -272,6 +326,7 @@ def default_release_compiler_options(env: SCons.Environment.Environment) -> Comp
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_release()
+		compiler_options.set_shared_object_prefix('')
 	else:
 		# unsupported platform
 		raise ValueError(f"Unsupported platform: {platform.system()}")
@@ -286,6 +341,7 @@ def default_release_with_debug_info_compiler_options(env: SCons.Environment.Envi
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_release_with_debug_info()
+		compiler_options.set_shared_object_prefix('')
 	elif platform.system() == 'Linux':
 		# Set the default compiler to GCC
 		compiler_options = CompilerEnvVarOptions(Compiler.GCC, env)
@@ -294,6 +350,7 @@ def default_release_with_debug_info_compiler_options(env: SCons.Environment.Envi
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_release_with_debug_info()
+		compiler_options.set_shared_object_prefix('')
 	elif platform.system() == 'Darwin':
 		# Set the default compiler to CLANG
 		compiler_options = CompilerEnvVarOptions(Compiler.CLANG, env)
@@ -302,6 +359,7 @@ def default_release_with_debug_info_compiler_options(env: SCons.Environment.Envi
 		compiler_options.set_dynamic_runtime()
 		compiler_options.set_cpp_standard(20)
 		compiler_options.set_release_with_debug_info()
+		compiler_options.set_shared_object_prefix('')
 	else:
 		# unsupported platform
 		raise ValueError(f"Unsupported platform: {platform.system()}")

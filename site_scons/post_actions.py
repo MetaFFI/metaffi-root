@@ -4,24 +4,40 @@ import SCons.Node
 import SCons.Node.FS
 from colorama import Fore
 import os
+import platform
 
 def execute_doctest_unitest(target, source, env):
 	
-	target_to_print = target
-	
-	if isinstance(target_to_print, list):
-		target_to_print = target_to_print[0]
-	
-	if isinstance(target_to_print, SCons.Node.FS.File):
-		print(f'Executing doctest: {target_to_print.abspath}')
+	if platform.system() == 'Windows':
+		env['ENV']['PATH'] = os.environ['PATH']
 	else:
-		print(f'Executing doctest: {target_to_print}')
+		env['ENV']['LD_LIBRARY_PATH'] = os.environ['LD_LIBRARY_PATH']
+
+	if isinstance(target, list):
+		target = target[0].abspath
+	
+	if isinstance(target, SCons.Node.FS.File):
+		print(f'Executing doctest: {target.abspath}')
+	elif isinstance(target, str):
+		print(f'Executing doctest: {target}')
+	else:
+		raise ValueError(f'Unsupported target type: {type(target)}')
 		
-	env.Execute(target)
+	exit_code = env.Execute(target)
+	if exit_code:
+		print(f"doctest unit test failed with exit code {exit_code}", file=sys.stderr)
+		sys.exit(1)
 		
 	
 def execute_go_unitest(target, source, env):
 	print(f'Executing Go Test: {os.getcwd()}')
-	env.Execute('go mod tidy')
-	env.Execute('go test -v')
+	exit_code = env.Execute('go mod tidy')
+	if exit_code:
+		print(f"Failed 'go mod tidy' with exit code {exit_code}", file=sys.stderr)
+		sys.exit(1)
+
+	exit_code = env.Execute('go test -v')
+	if exit_code:
+		print(f"Go test failed with exit code {exit_code}", file=sys.stderr)
+		sys.exit(1)
 
