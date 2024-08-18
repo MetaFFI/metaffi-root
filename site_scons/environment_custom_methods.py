@@ -1,3 +1,4 @@
+ # type: ignore
 import re
 from typing import Tuple
 import os

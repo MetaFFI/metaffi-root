@@ -1,3 +1,4 @@
+ # type: ignore
 from enum import Enum
 import os
 import platform

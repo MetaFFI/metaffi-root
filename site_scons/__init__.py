@@ -1,4 +1,4 @@
-from SCons.Script import Alias
+from SCons.Script import Alias  # type: ignore
 
 # ! --- define aliases ---
 ALIAS_BUILD = 'build' # builds the MetaFFI projects

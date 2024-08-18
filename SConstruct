@@ -1,4 +1,6 @@
+import json
 import os
+import platform
 from re import S
 import SCons.Environment
 import SCons.Script
@@ -177,6 +179,7 @@ SCons.Script.AddOption('--build-type',
 					   help='Build type (debug, release, release_debug_info)')
 
 SCons.Script.AddOption('--print-aliases', dest='print-aliases', action='store_true', help='Shows available aliases')
+SCons.Script.AddOption('--add-conan-to-c-cpp-properties', dest='add-conan-to-c-cpp-properties', action='store_true', help='Add Conan paths to c_cpp_properties.json')
 
 
 # * ---- Build the MetaFFI projects ----
@@ -236,8 +239,115 @@ def print_aliases(env):
 	print()
 
 
+def add_conan_cpp_path_to_c_cpp_properties():
+
+	# find recusive all "SConscript_conandeps" files
+	# extract conandeps/CPPPATH from the SConscript_conandeps files
+	# add the paths to .vscode/c_cpp_properties.json - make sure not to add dups
+
+	# for each project folder - find all SConscript_conandeps files
+	project_folders: list[str] = [f for f in os.listdir('.') if os.path.isdir(f) and not f.startswith('.')]
+	
+
+	for project_folder in project_folders:
+		print(f'Project folder: {project_folder} - ', end=' ')
+		
+		conandeps_files = []
+		for root, dirs, files in os.walk(project_folder):
+			for file in files:
+				if file == 'SConscript_conandeps':
+					conandeps_files.append(os.path.join(root, file))
+
+		if len(conandeps_files) == 0:
+			print(f'{Fore.RED}No conandeps found{Fore.RESET}')
+		else:
+			print(f'{Fore.GREEN}Found conandeps {len(conandeps_files)} files{Fore.RESET}')
+
+		# extract conandeps/CPPPATH from the SConscript_conandeps files
+		conandeps_cpp_paths = set()
+		for conandeps_file in conandeps_files:
+			# load the python SConscript_conandeps file
+			# the script sets "conandeps" dictionary
+			# in that dictionary, the key "conandeps" and then "CPPPATH" contains the paths as a list
+			# append to each path "/**" to make it recursive
+
+			conandeps = {}
+			deps_file = open(conandeps_file).read()
+
+			# remove "Return('conandeps')" line of code from deps_file
+			deps_file = re.sub(r'Return\(.*\)', '', deps_file)
+
+			exec(deps_file, conandeps)
+
+			if 'conandeps' in conandeps:
+				conandeps = conandeps['conandeps']
+
+			if 'conandeps' in conandeps and 'CPPPATH' in conandeps['conandeps']:
+				for path in conandeps['conandeps']['CPPPATH']:
+					# replace "\" with "/" and add "/**" to make it recursive
+					path = path.replace('\\', '/')
+					path = path + '/**'
+					conandeps_cpp_paths.add(path)
+
+		if len(conandeps_cpp_paths) == 0:
+			continue
+
+		# load the .vscode/c_cpp_properties.json file
+		# add the paths to the "includePath" array for each configuration.
+		# make sure there are no duplications
+		c_cpp_properties_file = f'{project_folder}/.vscode/c_cpp_properties.json'
+		if os.path.exists(c_cpp_properties_file):
+			with open(c_cpp_properties_file, 'r') as f:
+				c_cpp_properties = json.load(f)
+		else: # create default c_cpp_properties.json if there is none
+
+			# if windows, use msvc-x64 IntelliSense mode
+			# if linux, use gcc-x64 IntelliSense mode
+			intellisense_mode = ''
+			if platform.system() == 'Windows':
+				intellisense_mode = 'msvc-x64'
+			else:
+				intellisense_mode = 'gcc-x64'
+
+			c_cpp_properties = {
+				'configurations': [
+					{ 
+						"name": "default",
+						"cStandard": "c23",
+						"cppStandard": "c++20",
+						"intelliSenseMode": intellisense_mode,
+						"includePath": ["${workspaceFolder}/**"]
+					}
+				]
+			}
+
+		# add the paths to the "includePath" array for each configuration.
+		for configuration in c_cpp_properties['configurations']:
+			if 'includePath' not in configuration:
+				configuration['includePath'] = []
+
+			for path in conandeps_cpp_paths:
+				if path not in configuration['includePath']:
+					print(f'{Fore.MAGENTA} Adding path: {path}{Fore.RESET}')
+					configuration['includePath'].append(path)
+				else:
+					print(f'{Fore.BLUE}Path already exists: {path}{Fore.RESET}')
+
+		# write updated configuration to the file (use tabs to indent)
+
+		# make sure c_cpp_properties.json path and file exists, if not create it
+		os.makedirs(os.path.dirname(c_cpp_properties_file), exist_ok=True)
+
+		with open(c_cpp_properties_file, 'w') as f:
+			json.dump(c_cpp_properties, f, indent='\t')
+
+	print('Done')
 
 
 if SCons.Script.GetOption('print-aliases'):
 	print_aliases(env)
+	env.Exit()
+
+if SCons.Script.GetOption('add-conan-to-c-cpp-properties'):
+	add_conan_cpp_path_to_c_cpp_properties()
 	env.Exit()
