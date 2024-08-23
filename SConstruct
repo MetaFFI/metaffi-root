@@ -188,6 +188,7 @@ SCons.Script.SConscript('lang-plugin-python3/SConscript_python3', exports='env')
 SCons.Script.SConscript('lang-plugin-openjdk/SConscript_openjdk', exports='env')
 SCons.Script.SConscript('lang-plugin-go/SConscript_go', exports='env')
 SCons.Script.SConscript('metaffi-installer/SConscript_installer', exports='env')
+SCons.Script.SConscript('containers/SConscript_containers', exports='env')
 
 SCons.Script.Alias(ALIAS_BUILD, [ALIAS_CORE, ALIAS_PYTHON3, ALIAS_OPENJDK, ALIAS_GO])
 SCons.Script.Alias(ALIAS_UNITTESTS, [ALIAS_CORE_UNITTESTS, ALIAS_PYTHON3_UNITTESTS, ALIAS_OPENJDK_UNITTESTS, ALIAS_GO_UNITTESTS])
@@ -226,8 +227,11 @@ def print_aliases(env):
 		(ALIAS_PYTHON3_ALL, "Builds, runs unit tests and API tests for Python3 plugin", Fore.LIGHTRED_EX),
 		(ALIAS_GO_ALL, "Builds, runs unit tests and API tests for Go plugin", Fore.LIGHTRED_EX),
 		(ALIAS_OPENJDK_ALL, "Builds, runs unit tests and API tests for OpenJDK plugin", Fore.LIGHTRED_EX),
-		(ALIAS_BUILD_INSTALLER, 'Builds MetaFFI installer', Fore.CYAN+Style.DIM),
-		(ALIAS_PYTHON3_PUBLISH_API, 'Publish MetaFFI Python3 API library to PyPI', Fore.CYAN+Style.DIM),
+		(ALIAS_BUILD_INSTALLER, 'Builds MetaFFI installer', Fore.GREEN),
+		(ALIAS_PYTHON3_PUBLISH_API, 'Publish MetaFFI Python3 API library to PyPI', Fore.GREEN),
+		(ALIAS_BUILD_CONTAINER_U2204, 'Builds the Ubuntu 20.04 container', Fore.MAGENTA),
+		(ALIAS_BUILD_CONTAINER_WIN_S2022_NANO, 'Builds the Windows Server Nano 2022 container', Fore.MAGENTA),
+		(ALIAS_BUILD_ALL_CONTAINERS, 'Builds all containers', Fore.MAGENTA),
 	]
 
 	# Determine the maximum length of the alias names

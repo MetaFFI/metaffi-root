@@ -30,6 +30,11 @@ ALIAS_BUILD_INSTALLER = 'build-installer' # builds the MetaFFI installer project
 
 ALIAS_BUILD_AND_TEST = 'build-and-test' # builds all projects and runs all tests
 
+ALIAS_BUILD_CONTAINER_U2204 = 'build-container-u2204' # builds the Ubuntu 20.04 container
+ALIAS_BUILD_CONTAINER_WIN_S2022_NANO = 'build-container-win-server-nano-2022' # builds the Windows Server Nano 2022 container
+
+ALIAS_BUILD_ALL_CONTAINERS = 'build-all-containers' # builds all containers
+
 Alias(ALIAS_BUILD, [])
 Alias(ALIAS_CORE, [])
 Alias(ALIAS_CORE_UNITTESTS, [])
@@ -48,3 +53,6 @@ Alias(ALIAS_API_TESTS, [])
 Alias(ALIAS_ALL_TESTS, [])
 Alias(ALIAS_BUILD_INSTALLER, [])
 Alias(ALIAS_BUILD_AND_TEST, [])
+Alias(ALIAS_BUILD_CONTAINER_U2204, [])
+Alias(ALIAS_BUILD_CONTAINER_WIN_S2022_NANO, [])
+Alias(ALIAS_BUILD_ALL_CONTAINERS, [])
