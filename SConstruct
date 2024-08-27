@@ -230,7 +230,7 @@ def print_aliases(env):
 		(ALIAS_BUILD_INSTALLER, 'Builds MetaFFI installer', Fore.GREEN),
 		(ALIAS_PYTHON3_PUBLISH_API, 'Publish MetaFFI Python3 API library to PyPI', Fore.GREEN),
 		(ALIAS_BUILD_CONTAINER_U2204, 'Builds the Ubuntu 20.04 container', Fore.MAGENTA),
-		(ALIAS_BUILD_CONTAINER_WIN_S2022_NANO, 'Builds the Windows Server Nano 2022 container', Fore.MAGENTA),
+		(ALIAS_BUILD_CONTAINER_WIN_S2022_CORE, 'Builds the Windows Server Core 2022 container', Fore.MAGENTA),
 		(ALIAS_BUILD_ALL_CONTAINERS, 'Builds all containers', Fore.MAGENTA),
 	]
 
