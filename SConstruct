@@ -137,6 +137,10 @@ if not verify_project_exist(sconstruct_dir + '/metaffi-installer', 'https://gith
 	print('Failed to clone metaffi-installer. Exiting...', file=sys.stderr)
 	sys.exit(1)
 
+if not verify_project_exist(sconstruct_dir + '/metaffi.github.io', 'https://github.com/MetaFFI/metaffi.github.io.git'):
+	print('Failed to clone metaffi.github.io. Exiting...', file=sys.stderr)
+	sys.exit(1)	
+
 # * verify conan package manager exists
 if not env.WhereWithError('conan'):
 	print('Conan package manager is not installed. Install using "pip install conan" Exiting...', file=sys.stderr)
