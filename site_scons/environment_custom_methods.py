@@ -40,78 +40,6 @@ def WhereWithError(env: Environment, cmd: str) -> Tuple[bool, str]:
 	
 	return True, None
 
-def __fix_cross_compilation_of_cpython_in_conan(env: Environment, output_str: str, conan_install_cmd: str, envvars: dict) -> None:
-	# if the output_str contains "AssertionError: SRE module mismatch", it's a cross-compilation issue
-		print('Cross-compilation of CPython detected. Re-adjusting the environment variables...')
-
-		# extract the interpreter path from the output and set it to the PATH and PYTHONHOME
-
-		# if windows, extract the path from the output.
-		# use regex to extract the path
-		pattern = r'RUN: (.+?)python\.exe'
-		match = re.search(pattern, output_str)
-		if match is None:
-			print('Failed to extract built python interpreter path. Exiting...', file=sys.stderr)
-			sys.exit(1)
-
-		python_path = match.group(1)
-
-		print(f'Settings PYTHONHOME and adding to PATH for cross-compilation of CPython: "{python_path}"')
-
-		# set the PATH and PYTHONHOME
-		newpython_env = envvars.copy()
-		newpython_env['PATH'] = f'{python_path};{envvars["PATH"]}'
-		newpython_env['PYTHONHOME'] = python_path
-
-		# add the python_path and the lib directory so the new python can function properly
-		newpython_env['PYTHONPATH'] = f'{python_path}{os.pathsep}{python_path+"/../../Lib"}'
-
-		# extract from output_str the executed command and re-run it
-		# use regex to extract the command. The command starts with "RUN: {python_path}" and ends with "\n"
-		# make sure to encode python_path to escape special characters
-		pattern = r'RUN: (.+?python\.exe.*\n)'
-		match = re.search(pattern, output_str)
-		if match is None:
-			print('Failed to extract the executed command. Exiting...', file=sys.stderr)
-			sys.exit(1)
-
-		python_install_cmd = match.group(1)
-		python_install_cmd = python_install_cmd.replace('"--include-tcltk"', '')
-		print(f'Rerun setup command to complete the setup using the correct interpreter:\n"{python_install_cmd}"')
-
-		# re-run the command
-		process = subprocess.run(f'{python_install_cmd}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=newpython_env)
-		# Print stdout and stderr
-		print(process.stdout.decode())
-		print(process.stderr.decode(), file=sys.stderr)
-
-		if process.returncode != 0:
-			print('Failed to run the command. Exiting...', file=sys.stderr)
-			sys.exit(1)
-
-		# installing conan on new python interpreter
-		install_conan_cmd = f'{python_path+"python.exe"} -m pip install conan'
-		print(f'Installing conan on the new python interpreter: {install_conan_cmd}')
-		process = subprocess.run(f'{install_conan_cmd}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=newpython_env)
-		# Print stdout and stderr
-		print(process.stdout.decode())
-		print(process.stderr.decode(), file=sys.stderr)
-
-		if process.returncode != 0:
-			print('Failed to install conan on the new python interpreter. Exiting...', file=sys.stderr)
-			sys.exit(1)
-
-		# re-run conan install
-		print(f'Rerunning conan install command: {conan_install_cmd}')
-		process = subprocess.run(f'{conan_install_cmd}', shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=newpython_env)
-		# Print stdout and stderr
-		print(process.stdout.decode())
-		print(process.stderr.decode(), file=sys.stderr)
-
-		if process.returncode != 0:
-			print('Failed to run conan install. Exiting...', file=sys.stderr)
-			sys.exit(1)
-
 def __getConanPackages(env: Environment, conanfile:str, conandeps:str):
 	# get all existing batch files
 	# run 'conan install . --build=missing'
@@ -134,16 +62,9 @@ def __getConanPackages(env: Environment, conanfile:str, conandeps:str):
 
 	if process.returncode != 0:
 		# check if the issue is a cross-compilation of CPython
-		output_str = process.stderr.decode()
+		print('Failed to run conan install. Exiting...', file=sys.stderr)
+		sys.exit(1)
 
-		is_cpython_cross_compile_issue = 'AssertionError: SRE module mismatch' in output_str
-
-		if not is_cpython_cross_compile_issue:
-			print('Failed to run conan install. Exiting...', file=sys.stderr)
-			sys.exit(1)
-
-		# fix the cross-compilation issue
-		__fix_cross_compilation_of_cpython_in_conan(env, output_str, conan_install_cmd, envvars)
 			
 
 	# delete all batch files that don't exist in batch_files_before
