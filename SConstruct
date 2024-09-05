@@ -71,13 +71,31 @@ sys.stderr = ColorizedStdoutWrapper(sys.stderr)
 # * ---- Set up the environment ----
 env = SCons.Environment.Environment()
 
-required_env_vars = ['LocalAppData', 'AppData', 'ProgramData', 'ProgramFiles', 'SystemRoot', 'TEMP', 'METAFFI_HOME', 'TERM', 'JAVA_HOME', 'PYTHONHOME']
+# required_env_vars = ['LocalAppData',
+# 								'AppData',
+# 								'ProgramData',
+# 								'ProgramFiles',
+# 								'NUMBER_OF_PROCESSORS',
+# 								'SystemRoot',
+# 								'TEMP',
+# 								'TMP',
+# 								'METAFFI_HOME',
+# 								'TERM',
+# 								'JAVA_HOME',
+# 								'PYTHONHOME',
+# 								'VS140COMNTOOLS',
+# 								'WINDOWSSDKDIR',
+# 								'USERPROFILE']
 
-for var in required_env_vars:
-	if var in os.environ:
-		env['ENV'][var] = os.environ[var]
+# for var in required_env_vars:
+# 	if var in os.environ:
+# 		env['ENV'][var] = os.environ[var]
 
 env['METAFFI_HOME'] = os.environ['METAFFI_HOME']
+
+for var in os.environ:
+	if var not in env['ENV']:
+		env['ENV'][var] = os.environ[var]
 
 for p in os.environ['PATH'].split(os.pathsep):
 	if p not in env['ENV']['PATH']:
