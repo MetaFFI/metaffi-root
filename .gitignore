@@ -9,7 +9,8 @@ lang-plugin-go/
 
 lang-plugin-openjdk/
 
-lang-plugin-python3/
+lang-plugin-python311/
+lang-plugin-python312/
 
 metaffi-core/
 
@@ -24,8 +25,13 @@ vc140.pdb
 site_scons/__pycache__/
 
 metaffi_installer.py
+metaffi_plugin_go_installer.py
+metaffi_plugin_openjdk_installer.py
+metaffi_plugin_python311_installer.py
 containers/
 
 metaffi-installer/
 
 metaffi.github.io
+
+SConsSolution.py

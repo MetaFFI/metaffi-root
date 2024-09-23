@@ -107,7 +107,7 @@ def LoadConanPackagesInfo(env: Environment, conanfile: str = 'conanfile.txt', co
 			break
 			
 	if need_to_reinstall_conan_packages:
-		__getConanPackages(env, conandeps, conanfile)
+		__getConanPackages(env, conanfile, conandeps)
 		conan_info = SCons.Script.SConscript(conandeps)
 
 	env['conan_info'] = conan_info
@@ -118,6 +118,7 @@ def LoadConanPackagesInfo(env: Environment, conanfile: str = 'conanfile.txt', co
 	env.Append(CPPPATH=env['conan_info']['conandeps'].get('CPPPATH', []))
 	env.Append(LIBS=env['conan_info']['conandeps'].get('LIBS', []))
 	env.Append(LIBPATH=env['conan_info']['conandeps'].get('LIBPATH', []))
+	env['ENV']['PATH'] = os.path.pathsep.join(env['conan_info']['conandeps']['BINPATH']) + os.path.pathsep + env['ENV']['PATH']
 
 
 # CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS implementation

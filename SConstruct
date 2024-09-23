@@ -7,8 +7,9 @@ import SCons.Script
 import SCons.Node.FS
 import sys
 
+
 from regex import R
-import environment_custom_methods
+from site_scons import environment_custom_methods
 from git import Repo  # GitPython
 from SCons.Script.Main import Progress
 from colorama import Fore, Style, Back
@@ -24,15 +25,15 @@ class ColorizedStdoutWrapper(object):
 	def __init__(self, stream):
 		self.stream = stream
 		self.patterns = [
+			('failed:', Fore.RED),
+			('Error:', Fore.RED),
 			(r'^scons: \*\*\*', Fore.RED),
 			(r'^scons: building terminated', Fore.RED),
 			(r'^scons: done building targets.', Fore.GREEN),
-			(r'^scons:', Fore.YELLOW),
-			(r'^Install file:', Fore.YELLOW),
+			(r'^scons:.*', Fore.YELLOW),
+			(r'^Install (file|directory):', Fore.YELLOW),
 			(r'^metaffi ', Fore.CYAN),
 			('Creating library', Fore.MAGENTA),
-			('failed:', Fore.RED),
-			('Error:', Fore.RED),
 			(r'^Executing Go Test:', Fore.LIGHTBLUE_EX),
 			(r'^Executing doctest:', Fore.LIGHTBLUE_EX),
 			(r'^=== RUN', Fore.LIGHTBLUE_EX),
@@ -70,26 +71,6 @@ sys.stderr = ColorizedStdoutWrapper(sys.stderr)
 
 # * ---- Set up the environment ----
 env = SCons.Environment.Environment()
-
-# required_env_vars = ['LocalAppData',
-# 								'AppData',
-# 								'ProgramData',
-# 								'ProgramFiles',
-# 								'NUMBER_OF_PROCESSORS',
-# 								'SystemRoot',
-# 								'TEMP',
-# 								'TMP',
-# 								'METAFFI_HOME',
-# 								'TERM',
-# 								'JAVA_HOME',
-# 								'PYTHONHOME',
-# 								'VS140COMNTOOLS',
-# 								'WINDOWSSDKDIR',
-# 								'USERPROFILE']
-
-# for var in required_env_vars:
-# 	if var in os.environ:
-# 		env['ENV'][var] = os.environ[var]
 
 env['METAFFI_HOME'] = os.environ['METAFFI_HOME']
 
@@ -133,9 +114,9 @@ if not verify_project_exist(sconstruct_dir + '/metaffi-core', 'https://github.co
 	print('Failed to clone metaffi-core. Exiting...', file=sys.stderr)
 	sys.exit(1)
 
-if not verify_project_exist(sconstruct_dir + '/lang-plugin-python3',
-							'https://github.com/MetaFFI/lang-plugin-python3.git'):
-	print('Failed to clone lang-plugin-python3. Exiting...', file=sys.stderr)
+if not verify_project_exist(sconstruct_dir + '/lang-plugin-python311',
+							'https://github.com/MetaFFI/lang-plugin-python311.git'):
+	print('Failed to clone lang-plugin-python311. Exiting...', file=sys.stderr)
 	sys.exit(1)
 
 if not verify_project_exist(sconstruct_dir + '/lang-plugin-go', 'https://github.com/MetaFFI/lang-plugin-go.git'):
@@ -206,51 +187,47 @@ SCons.Script.AddOption('--add-conan-to-c-cpp-properties', dest='add-conan-to-c-c
 
 # * ---- Build the MetaFFI projects ----
 SCons.Script.SConscript('metaffi-core/SConscript_metaffi-core', exports='env')
-SCons.Script.SConscript('lang-plugin-python3/SConscript_python3', exports='env')
+SCons.Script.SConscript('lang-plugin-python311/SConscript_python311', exports='env')
 SCons.Script.SConscript('lang-plugin-openjdk/SConscript_openjdk', exports='env')
 SCons.Script.SConscript('lang-plugin-go/SConscript_go', exports='env')
 SCons.Script.SConscript('metaffi-installer/SConscript_installer', exports='env')
 SCons.Script.SConscript('containers/SConscript_containers', exports='env')
 
-SCons.Script.Alias(ALIAS_BUILD, [ALIAS_CORE, ALIAS_PYTHON3, ALIAS_OPENJDK, ALIAS_GO])
-SCons.Script.Alias(ALIAS_UNITTESTS, [ALIAS_CORE_UNITTESTS, ALIAS_PYTHON3_UNITTESTS, ALIAS_OPENJDK_UNITTESTS, ALIAS_GO_UNITTESTS])
-SCons.Script.Alias(ALIAS_API_TESTS, [ALIAS_PYTHON3_API_TESTS, ALIAS_GO_API_TESTS, ALIAS_OPENJDK_API_TESTS])
+SCons.Script.Alias(ALIAS_BUILD, [ALIAS_CORE, ALIAS_PYTHON311, ALIAS_OPENJDK, ALIAS_GO])
+SCons.Script.Alias(ALIAS_UNITTESTS, [ALIAS_CORE_UNITTESTS, ALIAS_PYTHON311_UNITTESTS, ALIAS_OPENJDK_UNITTESTS, ALIAS_GO_UNITTESTS])
+SCons.Script.Alias(ALIAS_API_TESTS, [ALIAS_PYTHON311_API_TESTS, ALIAS_GO_API_TESTS, ALIAS_OPENJDK_API_TESTS])
 
 SCons.Script.Alias(ALIAS_BUILD_AND_TEST, [ALIAS_BUILD, ALIAS_UNITTESTS, ALIAS_API_TESTS])
 
 SCons.Script.Alias(ALIAS_ALL_TESTS, [ALIAS_UNITTESTS, ALIAS_API_TESTS])
 
-SCons.Script.Alias(ALIAS_PYTHON3_ALL, [ALIAS_PYTHON3, ALIAS_PYTHON3_UNITTESTS, ALIAS_PYTHON3_API_TESTS])
+SCons.Script.Alias(ALIAS_PYTHON311_ALL, [ALIAS_PYTHON311, ALIAS_PYTHON311_UNITTESTS, ALIAS_PYTHON311_API_TESTS])
 SCons.Script.Alias(ALIAS_GO_ALL, [ALIAS_GO, ALIAS_GO_UNITTESTS, ALIAS_GO_API_TESTS])
 SCons.Script.Alias(ALIAS_OPENJDK_ALL, [ALIAS_OPENJDK, ALIAS_OPENJDK_UNITTESTS, ALIAS_OPENJDK_API_TESTS])
-
-
-SCons.Script.Default(ALIAS_BUILD)
-
 
 def print_aliases(env):
 	aliases = [
 		(ALIAS_BUILD, "Builds all MetaFFI projects", Fore.LIGHTYELLOW_EX),
 		(ALIAS_CORE, "Builds MetaFFI core", Fore.LIGHTYELLOW_EX),
-		(ALIAS_PYTHON3, "Builds Python3 plugin", Fore.LIGHTYELLOW_EX),
+		(ALIAS_PYTHON311, "Builds Python3.11 plugin", Fore.LIGHTYELLOW_EX),
 		(ALIAS_GO, "Builds Go plugin", Fore.LIGHTYELLOW_EX),
 		(ALIAS_OPENJDK, "Builds OpenJDK plugin", Fore.LIGHTYELLOW_EX),
 		(ALIAS_UNITTESTS, "Runs all unit tests", Fore.LIGHTMAGENTA_EX),
 		(ALIAS_CORE_UNITTESTS, "Runs MetaFFI core unit tests", Fore.LIGHTMAGENTA_EX),
-		(ALIAS_PYTHON3_UNITTESTS, "Runs Python3 plugin unit tests", Fore.LIGHTMAGENTA_EX),
+		(ALIAS_PYTHON311_UNITTESTS, "Runs Python3.11 plugin unit tests", Fore.LIGHTMAGENTA_EX),
 		(ALIAS_GO_UNITTESTS, "Runs Go plugin unit tests", Fore.LIGHTMAGENTA_EX),
 		(ALIAS_OPENJDK_UNITTESTS, "Runs OpenJDK plugin unit tests", Fore.LIGHTMAGENTA_EX),
 		(ALIAS_API_TESTS, "Runs all API tests", Fore.LIGHTGREEN_EX),
-		(ALIAS_PYTHON3_API_TESTS, "Runs Python3 plugin API tests", Fore.LIGHTGREEN_EX),
+		(ALIAS_PYTHON311_API_TESTS, "Runs Python3.11 plugin API tests", Fore.LIGHTGREEN_EX),
 		(ALIAS_GO_API_TESTS, "Runs Go plugin API tests", Fore.LIGHTGREEN_EX),
 		(ALIAS_OPENJDK_API_TESTS, "Runs OpenJDK plugin API tests", Fore.LIGHTGREEN_EX),
 		(ALIAS_BUILD_AND_TEST, "Builds and runs all unit tests and API tests", Fore.LIGHTBLUE_EX),
 		(ALIAS_ALL_TESTS, "Runs all unit tests and API tests", Fore.LIGHTBLUE_EX),
-		(ALIAS_PYTHON3_ALL, "Builds, runs unit tests and API tests for Python3 plugin", Fore.LIGHTRED_EX),
+		(ALIAS_PYTHON311_ALL, "Builds, runs unit tests and API tests for Python3.11 plugin", Fore.LIGHTRED_EX),
 		(ALIAS_GO_ALL, "Builds, runs unit tests and API tests for Go plugin", Fore.LIGHTRED_EX),
 		(ALIAS_OPENJDK_ALL, "Builds, runs unit tests and API tests for OpenJDK plugin", Fore.LIGHTRED_EX),
-		(ALIAS_BUILD_INSTALLER, 'Builds MetaFFI installer', Fore.GREEN),
-		(ALIAS_PYTHON3_PUBLISH_API, 'Publish MetaFFI Python3 API library to PyPI', Fore.GREEN),
+		(ALIAS_BUILD_INSTALLER, 'Builds MetaFFI and plugins installers', Fore.GREEN),
+		(ALIAS_PYTHON311_PUBLISH_API, 'Publish MetaFFI Python3.11 API library to PyPI', Fore.GREEN),
 		(ALIAS_BUILD_CONTAINER_U2204, 'Builds the Ubuntu 20.04 container', Fore.MAGENTA),
 		(ALIAS_BUILD_CONTAINER_WIN_S2022_CORE, 'Builds the Windows Server Core 2022 container', Fore.MAGENTA),
 		(ALIAS_BUILD_ALL_CONTAINERS, 'Builds all containers', Fore.MAGENTA),
@@ -370,7 +347,7 @@ def add_conan_cpp_path_to_c_cpp_properties():
 	print('Done')
 
 
-if SCons.Script.GetOption('print-aliases'):
+if SCons.Script.GetOption('print-aliases') or len(SCons.Script.COMMAND_LINE_TARGETS) == 0:
 	print_aliases(env)
 	env.Exit()
 

@@ -13,10 +13,14 @@ def search_lib_in_nodeslist(nodes: NodeList) -> list | None:
 	else:
 		return res
 	
-def python3_executable() -> str:
+def python3_executable(version: str | None = None) -> str:
 	# for windows - py
-	# else - python3.11
-	return 'py' if platform.system() == 'Windows' else 'python3.11'
+	# else - python3
+	
+	if version is None:
+		return 'py' if platform.system() == 'Windows' else 'python3'
+	else:
+		return f'py -{version}' if platform.system() == 'Windows' else f'python{version}'
 
 def to_list_of_str_or_str(input) -> str | list[str] | None:
 	if input is None:

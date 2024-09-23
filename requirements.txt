@@ -2,7 +2,8 @@ scons
 regex
 GitPython
 colorama
-
 conan
+dotenv
+pycrosskit
 
 # for tests

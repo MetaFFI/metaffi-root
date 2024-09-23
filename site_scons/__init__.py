@@ -6,11 +6,11 @@ ALIAS_BUILD = 'build' # builds the MetaFFI projects
 ALIAS_CORE = 'core' # builds the MetaFFI core project
 ALIAS_CORE_UNITTESTS = 'core-unittests' # runs the MetaFFI core project tests
 
-ALIAS_PYTHON3 = 'python3' # builds the Python3 language plugin
-ALIAS_PYTHON3_UNITTESTS = 'python3-unittests' # runs the Python3 language plugin tests
-ALIAS_PYTHON3_API_TESTS = 'python3-api-tests' # runs the Python3 language plugin cross-language tests
-ALIAS_PYTHON3_PUBLISH_API = 'python3-publish-api' # publishes the Python3 language plugin to PyPI
-ALIAS_PYTHON3_ALL = 'python3-all' # builds the Python3 language plugin and runs all tests
+ALIAS_PYTHON311 = 'python3' # builds the Python3 language plugin
+ALIAS_PYTHON311_UNITTESTS = 'python3-unittests' # runs the Python3 language plugin tests
+ALIAS_PYTHON311_API_TESTS = 'python3-api-tests' # runs the Python3 language plugin cross-language tests
+ALIAS_PYTHON311_PUBLISH_API = 'python3-publish-api' # publishes the Python3 language plugin to PyPI
+ALIAS_PYTHON311_ALL = 'python3-all' # builds the Python3 language plugin and runs all tests
 
 ALIAS_GO = 'go' # builds the Go language plugin
 ALIAS_GO_UNITTESTS = 'go-unittests' # runs the Go language plugin tests
@@ -38,10 +38,10 @@ ALIAS_BUILD_ALL_CONTAINERS = 'build-all-containers' # builds all containers
 Alias(ALIAS_BUILD, [])
 Alias(ALIAS_CORE, [])
 Alias(ALIAS_CORE_UNITTESTS, [])
-Alias(ALIAS_PYTHON3, [])
-Alias(ALIAS_PYTHON3_UNITTESTS, [])
-Alias(ALIAS_PYTHON3_API_TESTS, [])
-Alias(ALIAS_PYTHON3_PUBLISH_API, [])
+Alias(ALIAS_PYTHON311, [])
+Alias(ALIAS_PYTHON311_UNITTESTS, [])
+Alias(ALIAS_PYTHON311_API_TESTS, [])
+Alias(ALIAS_PYTHON311_PUBLISH_API, [])
 Alias(ALIAS_GO, [])
 Alias(ALIAS_GO_UNITTESTS, [])
 Alias(ALIAS_GO_API_TESTS, [])
