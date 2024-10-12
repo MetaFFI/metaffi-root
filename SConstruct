@@ -119,6 +119,11 @@ if not verify_project_exist(sconstruct_dir + '/lang-plugin-python311',
 	print('Failed to clone lang-plugin-python311. Exiting...', file=sys.stderr)
 	sys.exit(1)
 
+if not verify_project_exist(sconstruct_dir + '/lang-plugin-python312',
+							'https://github.com/MetaFFI/lang-plugin-python312.git'):
+	print('Failed to clone lang-plugin-python312. Exiting...', file=sys.stderr)
+	sys.exit(1)
+
 if not verify_project_exist(sconstruct_dir + '/lang-plugin-go', 'https://github.com/MetaFFI/lang-plugin-go.git'):
 	print('Failed to clone lang-plugin-go. Exiting...', file=sys.stderr)
 	sys.exit(1)
@@ -188,6 +193,7 @@ SCons.Script.AddOption('--add-conan-to-c-cpp-properties', dest='add-conan-to-c-c
 # * ---- Build the MetaFFI projects ----
 SCons.Script.SConscript('metaffi-core/SConscript_metaffi-core', exports='env')
 SCons.Script.SConscript('lang-plugin-python311/SConscript_python311', exports='env')
+SCons.Script.SConscript('lang-plugin-python312/SConscript_python312', exports='env')
 SCons.Script.SConscript('lang-plugin-openjdk/SConscript_openjdk', exports='env')
 SCons.Script.SConscript('lang-plugin-go/SConscript_go', exports='env')
 SCons.Script.SConscript('metaffi-installer/SConscript_installer', exports='env')
