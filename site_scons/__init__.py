@@ -6,6 +6,11 @@ ALIAS_BUILD = 'build' # builds the MetaFFI projects
 ALIAS_CORE = 'core' # builds the MetaFFI core project
 ALIAS_CORE_UNITTESTS = 'core-unittests' # runs the MetaFFI core project tests
 
+ALIAS_C = 'c' # builds the Go language plugin
+ALIAS_C_UNITTESTS = 'c-unittests' # runs the Go language plugin tests
+ALIAS_C_API_TESTS = 'c-api-tests' # runs the Go language plugin cross-language tests
+ALIAS_c_ALL = 'c-all' # builds the Go language plugin and runs all tests
+
 ALIAS_PYTHON311 = 'python311' # builds the Python3 language plugin
 ALIAS_PYTHON311_UNITTESTS = 'python311-unittests' # runs the Python3 language plugin tests
 ALIAS_PYTHON311_API_TESTS = 'python311-api-tests' # runs the Python3 language plugin cross-language tests

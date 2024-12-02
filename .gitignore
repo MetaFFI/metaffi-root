@@ -11,6 +11,7 @@ lang-plugin-openjdk/
 
 lang-plugin-python311/
 lang-plugin-python312/
+lang-plugin-*
 
 metaffi-core/
 
@@ -35,3 +36,6 @@ metaffi-installer/
 metaffi.github.io
 
 SConsSolution.py
+
+output
+cmake-build*
