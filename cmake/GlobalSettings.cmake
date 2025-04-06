@@ -2,6 +2,7 @@ macro(add_global_policies)
 	cmake_policy(SET CMP0110 NEW) # Allow arbitrary names in CTest names
 	cmake_policy(SET CMP0022 NEW) # Enable INTERFACE_LINK_LIBRARIES
 	cmake_policy(SET CMP0091 NEW) # MSVC runtime library flags
+	cmake_policy(SET CMP0077 NEW) # Allow setting CMAKE_MSVC_RUNTIME_LIBRARY
 endmacro()
 
 macro(os_and_platform)

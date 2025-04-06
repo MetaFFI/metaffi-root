@@ -1,10 +1,10 @@
 include(${CMAKE_CURRENT_LIST_DIR}/Utils.cmake)
 
 if(WIN32)
-	get_app_path("py" PYTHON_EXECUTABLE)
-	set(PYTHON_EXECUTABLE_ARG "-3.11")
+	set(PYTHON_EXECUTABLE "$ENV{LOCALAPPDATA}/Programs/Python/Python311/python3.exe")
+	set(PYTHON_EXECUTABLE_ARG "")
 else()
-	get_app_path("python3.11" PYTHON_EXECUTABLE)
+	set(PYTHON_EXECUTABLE "/usr/bin/python3.11")
 	set(PYTHON_EXECUTABLE_ARG "")
 endif()
 
@@ -23,8 +23,7 @@ macro(add_py_test NAME)
 			${ARGN})
 
 	if(WIN32)
-		set(PYEXECNAME "py")
-		get_app_path(${PYEXECNAME} PYEXECFULLPATH)
+		set(PYEXECFULLPATH "$ENV{LOCALAPPDATA}/Programs/Python/Python311/python3.exe")
 	else()
 		set(PYEXECFULLPATH "/usr/bin/python3.11")
 	endif()
