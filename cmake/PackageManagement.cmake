@@ -18,18 +18,18 @@ macro(add_vcpkg_integration)
 endmacro()
 
 macro(find_or_install_package package)
-	find_package(${package} ${ARGN})
+    find_package(${package} ${ARGN})
 
-	if(NOT ${package}_FOUND)
-		# find program vcpkg
-		find_program(VCPKG_EXECUTABLE vcpkg)
+    if(NOT ${package}_FOUND)
+        find_program(VCPKG_EXECUTABLE vcpkg REQUIRED)
+        execute_process(
+            COMMAND ${VCPKG_EXECUTABLE} install ${package}:x64-windows
+            RESULT_VARIABLE exit_code
+        )
+        if(exit_code)
+            message(FATAL_ERROR "Failed to install ${package}")
+        endif()
 
-		execute_process(COMMAND ${VCPKG_EXECUTABLE} install ${package}:x64-windows
-				RESULT_VARIABLE exit_code)
-		if(exit_code)
-			message(FATAL_ERROR "Failed to install ${package}")
-		endif()
-
-		find_package(${package} REQUIRED ${ARGN})
-	endif()
+        find_package(${package} ${ARGN} REQUIRED)
+    endif()
 endmacro()
