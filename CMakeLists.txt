@@ -3,6 +3,12 @@ cmake_minimum_required(VERSION 3.10)
 
 # set the ./cmake path (as absolute path) to a variable
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+include(Environment)
+
+# load the msvc environment
+load_msvc_env(x64)
+
 include(PackageManagement)
 
 # add vcpkg integration - MUST be before project() call
