@@ -75,11 +75,9 @@ macro(load_msvc_env ARCH)
 					if("${_name}" STREQUAL "Path")
 						# Concatenate PATH instead of replacing
 						set(ENV{PATH} "${_value};$ENV{PATH}")
-						message(STATUS "Appended to PATH: ${_value}")
 					else()
 						# Set all other variables normally
 						set(ENV{${_name}} "${_value}")
-						message(STATUS "Set ENV: ${_name}=${_value}")
 					endif()
 				endif()
 			endif()
