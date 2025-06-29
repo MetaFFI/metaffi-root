@@ -41,3 +41,5 @@ output
 cmake-build*
 
 build/*
+
+__pycache__/
