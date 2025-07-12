@@ -1,0 +1,59 @@
+---
+description: get overview information and core abstractions about MetaFFI
+alwaysApply: false
+---
+# MetaFFI Technical Architecture
+
+MetaFFI is a multilingual, cross-language interoperability framework that enables calling functions, methods, or accessing properties across different programming languages. It is designed around a plugin-based architecture, allowing new languages to be integrated via plugins without modifying the core system. Each plugin is a dynamic library implementing and exporting its plugin interface. XLLR dynamic library (implemented in metaffi-core/XLLR) is coordinating between the runtime plugins.
+
+## Core Abstractions
+
+### XCall
+The core abstraction in MetaFFI is the "XCall", which represents a cross-language function call using a universal C-based function pointer and context. This abstraction enables ABI-agnostic interoperation between languages, allowing foreign functions, methods, and callbacks to be invoked as if they were native.
+
+### Common Data Types (CDTs)
+MetaFFI operates by translating foreign-language entities into "CDTs" (Common Data Types), which are language-neutral representations of values such as integers, strings, arrays, and objects. CDTs act as a bridge between runtimes, enabling structured data to pass between languages safely.
+
+## System Components
+
+### MetaFFI Core (XLLR)
+- Handles the runtime dispatching of XCalls
+- Manages the core interoperability functionality
+- Coordinates between different language plugins
+
+### Runtime Plugins
+- Each plugin implements the interface required to expose a language's functions/entities
+- Handles the translation between native types and CDTs
+- Manages the invocation and reception of XCalls
+
+### Compiler Plugin
+- Static analysis tool that parses interface definitions
+- Generates binding code and metadata
+- Enables static resolution of cross-language calls
+
+### FFI APIs
+- Minimal C-style APIs that enable embedding MetaFFI in any host program
+- Provides the foundation for cross-language communication
+
+## Design Priorities
+
+### Integration Complexity
+- O(n) integration complexity: Each language only needs a plugin to interoperate with any other supported language
+- Minimal changes required to add new language support
+
+### Performance
+- Runtime performance optimization through static metadata resolution
+- Use of pre-compiled plugin binaries
+- Efficient data type conversion and marshaling
+
+### Deployment Flexibility
+- Static linking support: Components can be embedded into a single binary
+- Works without dynamic linking or reflection
+- Suitable for resource-constrained environments
+
+### Communication Model
+- Bidirectional calls between languages
+- Support for asynchronous callbacks
+- Full globals/function/method/property access across language boundaries
+
+

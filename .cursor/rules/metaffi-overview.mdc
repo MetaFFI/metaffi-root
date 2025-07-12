@@ -1,0 +1,47 @@
+---
+description: get overview of MetaFFI project and root directories
+alwaysApply: false
+---
+# MetaFFI Project Overview
+
+MetaFFI is a sophisticated Multi-Lingual Interoperability System that enables seamless communication between different programming languages. The project consists of several key components:
+
+## Core Components in root directory
+- `metaffi-core/`: The central hub that manages language interoperability
+- Language Plugins:
+- `lang-plugin-python311/`: MetaFFI Python 3.x Plugin
+- `lang-plugin-go/`: MetaFFI Go language Plugin
+- `lang-plugin-openjdk/`: MetaFFI Java/JVM languages Plugin
+- `lang-plugin-c/`: MetaFFI C language Plugin
+- `CMakeLists.txt`: Top-level CMake build configuration file that orchestrates the entire MetaFFI project, including its core runtime, language plugins, containers, and installer.
+- `build_target.py`: Python script for managing or generating build targets across different environments. It may define or assist in platform-specific build logic.
+- ctest is used to execute unit tests and system tests.
+
+## Key Features
+- Enables cross-language communication without virtual machines or recompilation
+- Supports dynamic loading of modules across different languages
+- Uses Foreign Function Interface (FFI) and embedding mechanisms
+- Each language runs in its native runtime environment
+- Currently supports Python 3.x, Go, and JVM languages
+
+## Project Structure
+- `metaffi.github.io/`: Project documentation and website
+- `metaffi-installer/`: Installation utilities
+- `containers/`: Docker container configurations
+- `cmake/`: Additional CMake scripts used in the project
+- `output/`: Build output directory seperated by OS, architecture, and build type. For example, Windows, x64, Debug would be: output/windows/x64/Debug/.
+
+## Development Environment
+- Uses CMake for cross-platform build system
+- Supports Windows and Ubuntu platforms
+- Includes IDE configurations for CLion
+- Follows C++ code formatting standards (`.clang-format`)
+
+## Documentation
+- Comprehensive documentation available at metaffi.github.io
+- Github repositories are at github.com/MetaFFI/
+- API documentation for each supported language
+- Usage examples and tutorials
+
+
+

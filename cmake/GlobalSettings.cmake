@@ -3,7 +3,7 @@ macro(add_global_policies)
 	cmake_policy(SET CMP0022 NEW) # Enable INTERFACE_LINK_LIBRARIES
 	cmake_policy(SET CMP0091 NEW) # MSVC runtime library flags
 	cmake_policy(SET CMP0077 NEW) # Allow setting CMAKE_MSVC_RUNTIME_LIBRARY
-	cmake_policy(SET CMP0167 NEW) 
+	
 endmacro()
 
 macro(os_and_platform)
