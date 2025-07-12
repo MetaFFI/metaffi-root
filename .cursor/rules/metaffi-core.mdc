@@ -1,6 +1,5 @@
 ---
-description: 
-globs: metaffi-core/**
+description: get information about metaffi-core
 alwaysApply: false
 ---
 # MetaFFI Core Framework
