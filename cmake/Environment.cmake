@@ -6,6 +6,16 @@
 #
 # Call this *before* the first project() or enable_language().
 
+function(escape_list input output)
+    string(REPLACE ";" "<:>" _escaped "${input}")
+    set(${output} "${_escaped}" PARENT_SCOPE)
+endfunction()
+
+function(unescape_list input output)
+    string(REPLACE "<:>" ";" _unescaped "${input}")
+    set(${output} "${_unescaped}" PARENT_SCOPE)
+endfunction()
+
 macro(load_msvc_env ARCH)
     # Do nothing on non-Windows hosts
     if(WIN32)
@@ -51,15 +61,27 @@ macro(load_msvc_env ARCH)
 		endif()
 
 		# Import each VAR=VALUE line into CMake process env
+
+		# replace all ; to \;
+		string(REPLACE ";" "\\;" _env_raw "${_env_raw}")
+
 		string(REPLACE "\r\n" "\n" _env_raw "${_env_raw}")
+		string(REPLACE "\r" "\n" _env_raw "${_env_raw}")
+
+		#escape_list("${_env_raw}" _env_raw)
+
+		string(REPLACE "\\\n" "/\n" _env_raw "${_env_raw}")
+		string(REPLACE "\n" ";" _env_lines "${_env_raw}")
 		
 		# Variables to explicitly skip (they interfere with MSVC detection)
 		set(_skip_vars LLVM_DIR)
 		
-		# Split by newlines to get individual lines - use a more robust approach
-		string(REGEX MATCHALL "[^=]+=.*" _env_lines "${_env_raw}")
-		
 		foreach(_line IN LISTS _env_lines)
+			# if _line starts with JAVA_HOME - print it
+			if(_line MATCHES "^JAVA_HOME=")
+				message(STATUS "JAVA_HOME: ${_line}")
+			endif()
+
 			string(FIND "${_line}" "=" _eq)
 			if(_eq GREATER 0)
 				string(SUBSTRING "${_line}" 0 ${_eq} _name)
@@ -74,13 +96,31 @@ macro(load_msvc_env ARCH)
 					# Process all variables except PATH
 					if("${_name}" STREQUAL "Path")
 						# Concatenate PATH instead of replacing
+						#unescape_list("${_value}" _value)
 						set(ENV{PATH} "${_value};$ENV{PATH}")
 					else()
 						# Set all other variables normally
+						#unescape_list("${_value}" _value)
 						set(ENV{${_name}} "${_value}")
 					endif()
 				endif()
 			endif()
 		endforeach()
+
+		message(STATUS "PATH: $ENV{PATH}")
+
+		# make sure cl.exe and rc.exe are found
+		find_program(CL_EXE NAMES cl.exe)
+		find_program(RC_EXE NAMES rc.exe)
+		if(NOT CL_EXE)
+			message(FATAL_ERROR "cl.exe not found")
+		endif()
+		if(NOT RC_EXE)
+			message(FATAL_ERROR "rc.exe not found")
+		endif()
+
+		message(STATUS "PATH: $ENV{PATH}")
+		message(STATUS "JAVA_HOME: $ENV{JAVA_HOME}")
+
 	endif()
 endmacro()
