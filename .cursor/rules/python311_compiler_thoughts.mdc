@@ -1,0 +1,635 @@
+# MetaFFI Compiler Plugin Development Knowledge Base
+
+## Overview
+
+This document serves as a knowledge base for developing MetaFFI compiler plugins. It documents the architecture, patterns, implementation strategies, and lessons learned from building the Python311 compiler plugin, but is designed to be applicable to compiler plugins for any programming language.
+
+## Core Architecture
+
+### Plugin Interface
+
+MetaFFI compiler plugins implement the `language_plugin_interface` C interface:
+
+```cpp
+struct language_plugin_interface {
+    virtual void init() = 0;
+    
+    // Compiles IDL to executable code called from XLLR to the foreign function
+    virtual void compile_to_guest(const char* idl_def_json, uint32_t idl_def_json_length,
+                                 const char* output_path, uint32_t output_path_length,
+                                 const char* guest_options, uint32_t guest_options_length,
+                                 char** out_err, uint32_t* out_err_len) = 0;
+
+    // Compile IDL to code calling to XLLR from host code
+    virtual void compile_from_host(const char* idl_def_json, uint32_t idl_def_json_length,
+                                  const char* output_path, uint32_t output_path_length,
+                                  const char* host_options, uint32_t host_options_length,
+                                  char** out_err, uint32_t* out_err_len) = 0;
+};
+```
+
+### Go Implementation Pattern
+
+Compiler plugins are implemented in Go using CGO to export C functions:
+
+```go
+package main
+
+import (
+    "github.com/MetaFFI/plugin-sdk/compiler/go"
+)
+
+import "C"
+
+//export init_plugin
+func init_plugin() {
+    compiler.PluginMain = compiler.NewLanguagePluginMain(NewHostCompiler(), NewGuestCompiler())
+}
+
+//export compile_to_guest
+func compile_to_guest(idl_def_json *C.char, idl_def_json_length C.uint,
+                     output_path *C.char, output_path_length C.uint,
+                     guest_options *C.char, guest_options_length C.uint,
+                     out_err **C.char, out_err_len *C.uint) {
+    // Implementation
+}
+
+//export compile_from_host
+func compile_from_host(idl_def_json *C.char, idl_def_json_length C.uint,
+                      output_path *C.char, output_path_length C.uint,
+                      host_options *C.char, host_options_length C.int,
+                      out_err **C.char, out_err_len *C.uint) {
+    // Implementation
+}
+
+func main() {}
+```
+
+## Compiler Types and Responsibilities
+
+### Host Compiler (`compile_from_host`)
+
+**Purpose**: Generate code in the target language that calls foreign functions.
+
+**Input**: IDL definition describing entities in a foreign language
+**Output**: Target language code that uses MetaFFI API to call foreign entities
+
+**Key Responsibilities**:
+- Parse IDL definition to understand foreign entities
+- Generate target language code that mirrors foreign entities
+- Use MetaFFI API to load and call foreign functions/classes
+- Handle type conversions between target language and MetaFFI types
+- Generate proper error handling and resource management
+
+**Example Use Case**: Generate Python code that calls Java functions
+
+### Guest Compiler (`compile_to_guest`)
+
+**Purpose**: Generate entry points for foreign code to call target language functions.
+
+**Input**: IDL definition describing target language entities
+**Output**: Code that exposes target language entities to foreign code
+
+**Key Responsibilities**:
+- Generate entry point functions that can be called from C
+- Handle parameter marshaling between C and target language
+- Manage object lifecycle and memory
+- Provide proper error handling
+
+**Note**: Some languages (like Python) may not require guest compilation if they don't need code modifications to be called from C.
+
+## IDL Structure and Parsing
+
+### IDL Definition Structure
+
+The IDL is provided as JSON and parsed into `IDL.IDLDefinition`:
+
+```go
+type IDLDefinition struct {
+    IDLFilenameWithExtension string
+    TargetLanguage          string
+    Modules                 []*ModuleDefinition
+    // ... other fields
+}
+
+type ModuleDefinition struct {
+    Name    string
+    Classes []*ClassDefinition
+    Functions []*FunctionDefinition
+    Globals  []*GlobalDefinition
+    // ... other fields
+}
+
+type ClassDefinition struct {
+    Name         string
+    Constructors []*MethodDefinition
+    Methods      []*MethodDefinition
+    Fields       []*FieldDefinition
+    Release      *MethodDefinition
+}
+
+type MethodDefinition struct {
+    Name           string
+    Parameters     []*ArgDefinition
+    ReturnValues   []*ArgDefinition
+    InstanceRequired bool
+    // ... other fields
+}
+
+type ArgDefinition struct {
+    Name      string
+    Type      string // MetaFFI type (e.g., "int64", "string8", "handle")
+    TypeAlias string
+    Dimensions int
+    // ... other fields
+}
+```
+
+### MetaFFI Type System
+
+MetaFFI uses a standardized type system that maps to language-specific types:
+
+- `int8`, `int16`, `int32`, `int64` - Integer types
+- `uint8`, `uint16`, `uint32`, `uint64` - Unsigned integer types
+- `float32`, `float64` - Floating point types
+- `bool` - Boolean type
+- `string8`, `string16`, `string32` - String types
+- `handle` - Object references
+- `any` - Generic type
+- `*_array` - Array types (e.g., `int64_array`)
+
+## Code Generation Strategies
+
+### Template-Based Generation
+
+**Recommended Approach**: Use Go's `text/template` package for code generation.
+
+**Advantages**:
+- Clean separation of logic and templates
+- Easy to maintain and modify
+- Supports complex template logic
+- Built-in security features
+
+**Template Structure**:
+```go
+const HostTemplate = `
+# Generated code header
+{{range .Modules}}
+# Module: {{.Name}}
+{{range .Functions}}
+def {{.Name}}({{range $index, $param := .Parameters}}{{if $index}}, {{end}}{{$param.Name}}: {{ConvertToPythonType $param}}{{end}}) -> {{ConvertToPythonType .ReturnValues}}:
+    # Implementation using MetaFFI API
+{{end}}
+{{end}}
+`
+```
+
+### Template Functions
+
+Create custom template functions for type conversion and code generation:
+
+```go
+var templatesFuncMap = map[string]interface{}{
+    "ConvertToPythonType": convertToPythonType,
+    "GenerateMethodSignature": generateMethodSignature,
+    "GetMetaFFIType": getMetaFFIType,
+    // ... other functions
+}
+```
+
+### Alternative Approaches
+
+## Implementation Lessons Learned
+
+### Template Iteration Patterns
+
+**CRITICAL**: Always iterate over collections instead of using index access in templates.
+
+**❌ Wrong Approach** (makes assumptions):
+```gotemplate
+{{range $index, $param := (index .Constructors 0).Parameters}}
+{{ConvertToPythonType $param.Type (IsArray $param.Dimensions)}}
+{{end}}
+```
+
+**✅ Correct Approach** (iterates safely):
+```gotemplate
+{{range $constructor := .Constructors}}
+{{range $index, $param := $constructor.Parameters}}
+{{ConvertToPythonType $param.Type (IsArray $param.Dimensions)}}
+{{end}}
+{{end}}
+```
+
+**Why This Matters**:
+- Avoids assumptions about collection size
+- Handles empty collections gracefully
+- More robust and maintainable
+- Prevents template execution errors
+
+### IDL Structure Usage
+
+**Creating Test Data**: Use programmatic IDL creation instead of hardcoded JSON:
+
+```go
+func createSimpleFunctionIDL() *IDL.IDLDefinition {
+    idl := IDL.NewIDLDefinition("simple_function.json", "openjdk")
+    module := IDL.NewModuleDefinition("com.example.Math")
+    
+    function := IDL.NewFunctionDefinition("add")
+    function.SetEntityPath("entrypoint_function", "EntryPoint_add")
+    function.SetEntityPath("metaffi_guest_lib", "Math_MetaFFIGuest")
+    
+    // Add parameters
+    param1 := &IDL.ArgDefinition{
+        Name:      "a",
+        Type:      IDL.INT64,
+        Dimensions: 0,
+    }
+    function.AddParameter(param1)
+    
+    module.AddFunction(function)
+    idl.AddModule(module)
+    return idl
+}
+```
+
+**Benefits**:
+- Type-safe IDL creation
+- Easier to maintain and modify
+- No JSON parsing errors
+- Better IDE support
+
+### Template Function Design
+
+**Helper Functions**: Create utility functions for common template operations:
+
+```go
+func isArray(dimensions int) bool {
+    return dimensions > 0
+}
+
+var templatesFuncMap = map[string]interface{}{
+    "IsArray": isArray,
+    "ConvertToPythonType": convertToPythonType,
+    // ... other functions
+}
+```
+
+**Type Conversion Functions**: Ensure functions handle both type and array dimensions:
+
+```go
+func convertToPythonType(metaffiType IDL.MetaFFIType, isArray bool) string {
+    var res string
+    switch metaffiType {
+    case IDL.INT64:
+        res = "int"
+    case IDL.FLOAT64:
+        res = "float"
+    case IDL.STRING8:
+        res = "str"
+    case IDL.BOOL:
+        res = "bool"
+    case IDL.HANDLE:
+        res = "Any"
+    default:
+        res = "Any"
+    }
+    
+    if isArray {
+        res = "List[" + res + "]"
+    }
+    return res
+}
+```
+
+### Testing Strategies
+
+**Comprehensive Test Coverage**: Test all compiler components:
+
+```go
+func TestSimpleFunctionHost(t *testing.T) {
+    def := createSimpleFunctionIDL()
+    
+    err := os.Mkdir("temp_simple_function", 0700)
+    if err != nil {
+        t.Fatal(err)
+    }
+    defer os.RemoveAll("temp_simple_function")
+    
+    cmp := NewHostCompiler()
+    err = cmp.Compile(def, "temp_simple_function", "", nil)
+    if err != nil {
+        t.Fatal(err)
+    }
+    
+    // Verify generated file exists
+    expectedFile := "temp_simple_function/simple_function_MetaFFIHost.py"
+    if _, err := os.Stat(expectedFile); os.IsNotExist(err) {
+        t.Errorf("Expected file %s was not generated", expectedFile)
+    }
+}
+```
+
+**Test Categories**:
+1. **Unit Tests**: Test individual template functions
+2. **Integration Tests**: Test full compilation pipeline
+3. **Edge Case Tests**: Test unusual IDL structures
+4. **Generated Code Tests**: Verify generated code syntax
+
+### Error Handling Patterns
+
+**Template Execution Errors**: Handle template parsing and execution errors gracefully:
+
+```go
+func (this *HostCompiler) parseFunctions() (string, error) {
+    tmp, err := template.New("Functions").Funcs(templatesFuncMap).Parse(FunctionsTemplate)
+    if err != nil {
+        return "", fmt.Errorf("Failed to parse FunctionsTemplate: %v", err)
+    }
+    
+    buf := strings.Builder{}
+    err = tmp.Execute(&buf, this.def)
+    if err != nil {
+        return "", fmt.Errorf("Failed to execute FunctionsTemplate: %v", err)
+    }
+    
+    return buf.String(), err
+}
+```
+
+**IDL Validation**: Validate IDL structure before processing:
+
+```go
+func validateIDL(def *IDL.IDLDefinition) error {
+    if def == nil {
+        return fmt.Errorf("IDL definition is nil")
+    }
+    if len(def.Modules) == 0 {
+        return fmt.Errorf("IDL definition has no modules")
+    }
+    return nil
+}
+```
+
+### MetaFFI API Integration
+
+**Runtime Initialization**: Generate proper MetaFFI runtime setup:
+
+```python
+# Initialize MetaFFI runtime
+runtime = None
+module = None
+
+def initialize_runtime(target_language: str = "openjdk", module_path: str = "com.example"):
+    global runtime, module
+    if runtime is None:
+        runtime = metaffi.metaffi_runtime.MetaFFIRuntime(target_language)
+        module = metaffi.MetaFFIModule(runtime, module_path)
+    return runtime, module
+
+# Auto-initialize on import
+initialize_runtime()
+```
+
+**Entity Loading**: Use MetaFFI API for loading foreign entities:
+
+```python
+def add_numbers(a: int, b: int) -> int:
+    entity = module.load_entity("add_numbers", 
+                               [MetaFFITypes.metaffi_int64_type, MetaFFITypes.metaffi_int64_type],
+                               [MetaFFITypes.metaffi_int64_type])
+    return entity(a, b)
+```
+
+### Code Organization Best Practices
+
+**File Structure**:
+```
+compiler/
+├── HostCompiler.go          # Main host compiler logic
+├── GuestCompiler.go         # Guest compiler (if needed)
+├── MetaFFIHostTemplate.go   # MetaFFI API-based templates
+├── HostTemplate.go          # Legacy templates (if any)
+├── TemplateFunctions.go      # Template helper functions
+├── HostCompiler_test.go     # Host compiler tests
+├── GuestCompiler_test.go    # Guest compiler tests
+└── python311_compiler_thoughts.mdc  # This knowledge base
+```
+
+**Template Organization**:
+- Separate templates for different code sections (functions, classes, globals)
+- Use descriptive template names
+- Keep templates focused and single-purpose
+- Document template variables and expected structure
+
+### Performance Considerations
+
+**Template Caching**: Reuse parsed templates when possible:
+
+```go
+var (
+    functionsTemplate *template.Template
+    classesTemplate   *template.Template
+    globalsTemplate   *template.Template
+)
+
+func init() {
+    var err error
+    functionsTemplate, err = template.New("Functions").Funcs(templatesFuncMap).Parse(FunctionsTemplate)
+    if err != nil {
+        panic(err)
+    }
+    // ... initialize other templates
+}
+```
+
+**Memory Management**: Clean up temporary files and resources:
+
+```go
+defer func() {
+    err = os.RemoveAll("temp_output")
+    if err != nil {
+        t.Fatal(err)
+    }
+}()
+```
+
+## Future Considerations
+
+### Extensibility
+
+1. **Plugin Architecture**: Design for easy extension
+2. **Configuration**: Support compiler options
+3. **Custom Templates**: Allow custom template overrides
+4. **Language Features**: Support new language features
+
+### Performance Optimization
+
+1. **Parallel Compilation**: Compile multiple modules in parallel
+2. **Incremental Compilation**: Only regenerate changed code
+3. **Caching**: Cache compilation results
+4. **Optimization**: Optimize generated code
+
+## Phase 2: Host Compiler Implementation Plan
+
+### Overview
+
+The Host Compiler (`compile_from_host`) is responsible for generating Python code that can call foreign functions using the MetaFFI API. This is the primary functionality needed for Python311 compiler plugin.
+
+### Step-by-Step Implementation Plan
+
+#### Step 1: Analyze Current Implementation
+1. **Review Existing Code**: Examine current `HostCompiler.go` implementation
+2. **Identify Gaps**: Determine what's missing or needs improvement
+3. **Template Analysis**: Review `HostTemplate.go` for completeness
+4. **Type Conversion**: Verify `TemplateFunctions.go` covers all needed conversions
+
+#### Step 2: Enhance Template System
+1. **Template Structure**: Ensure templates generate proper Python code using MetaFFI API
+2. **Import Generation**: Add proper imports for `metaffi` package
+3. **Runtime Initialization**: Generate runtime setup code
+4. **Module Loading**: Generate code to load foreign modules
+
+#### Step 3: Implement Core Generation Logic
+1. **Function Generation**: Generate Python functions that call foreign functions
+2. **Class Generation**: Generate Python classes that mirror foreign classes
+3. **Global Variable Handling**: Generate getters/setters for global variables
+4. **Constructor Support**: Handle class constructors and object creation
+
+#### Step 4: MetaFFI API Integration
+1. **Entity Loading**: Generate code to load foreign entities using `metaffi.MetaFFIModule.load_entity()`
+2. **Type Mapping**: Map MetaFFI types to Python types and vice versa
+3. **Parameter Handling**: Handle parameter passing and return value processing
+4. **Error Handling**: Implement proper error handling in generated code
+
+#### Step 5: Advanced Features
+1. **Array Support**: Handle array types and multi-dimensional arrays
+2. **Type Aliases**: Support custom type aliases
+3. **Overloaded Functions**: Handle function overloading
+4. **Object Lifecycle**: Manage object creation and destruction
+
+#### Step 6: Testing and Validation
+1. **Unit Tests**: Test individual generation components
+2. **Integration Tests**: Test full compilation pipeline
+3. **Generated Code Tests**: Verify generated Python code works correctly
+4. **Edge Case Testing**: Test unusual IDL structures
+
+### Technical Implementation Details
+
+#### Template-Based Approach
+```go
+// Use text/template for code generation
+const HostTemplate = `
+# Code generated by MetaFFI. DO NOT EDIT.
+import metaffi
+from metaffi import MetaFFITypes
+
+# Initialize runtime
+runtime = metaffi.metaffi_runtime.MetaFFIRuntime("{{.TargetLanguage}}")
+module = metaffi.MetaFFIModule(runtime, "{{.ModulePath}}")
+
+{{range .Functions}}
+def {{.Name}}({{range $index, $param := .Parameters}}{{if $index}}, {{end}}{{$param.Name}}: {{ConvertToPythonType $param}}{{end}}) -> {{ConvertToPythonType .ReturnValues}}:
+    entity = module.load_entity("{{.Name}}", 
+                               [{{range $index, $param := .Parameters}}{{if $index}}, {{end}}{{GetMetaFFIType $param}}{{end}}],
+                               [{{range $index, $ret := .ReturnValues}}{{if $index}}, {{end}}{{GetMetaFFIType $ret}}{{end}}])
+    return entity({{range $index, $param := .Parameters}}{{if $index}}, {{end}}{{$param.Name}}{{end}})
+{{end}}
+`
+```
+
+#### Type Conversion Functions
+```go
+func convertToPythonType(arg *IDL.ArgDefinition) string {
+    if arg.Dimensions > 0 {
+        return "List[" + convertToPythonType(arg) + "]"
+    }
+    
+    switch arg.Type {
+    case "int64":
+        return "int"
+    case "float64":
+        return "float"
+    case "string8":
+        return "str"
+    case "bool":
+        return "bool"
+    case "handle":
+        if arg.TypeAlias != "" {
+            return arg.TypeAlias
+        }
+        return "Any"
+    default:
+        return "Any"
+    }
+}
+```
+
+#### MetaFFI Type Mapping
+```go
+func getMetaFFIType(arg *IDL.ArgDefinition) string {
+    switch arg.Type {
+    case "int64":
+        return "MetaFFITypes.metaffi_int64_type"
+    case "float64":
+        return "MetaFFITypes.metaffi_float64_type"
+    case "string8":
+        return "MetaFFITypes.metaffi_string8_type"
+    case "bool":
+        return "MetaFFITypes.metaffi_bool_type"
+    case "handle":
+        return "MetaFFITypes.metaffi_handle_type"
+    default:
+        return "MetaFFITypes.metaffi_any_type"
+    }
+}
+```
+
+### Expected Output Structure
+
+#### Generated Python Module
+```python
+# Code generated by MetaFFI. DO NOT EDIT.
+import metaffi
+from metaffi import MetaFFITypes
+from typing import List, Any
+
+# Initialize runtime
+runtime = metaffi.metaffi_runtime.MetaFFIRuntime("openjdk")
+module = metaffi.MetaFFIModule(runtime, "com.example.MyClass")
+
+def add_numbers(a: int, b: int) -> int:
+    entity = module.load_entity("add_numbers", 
+                               [MetaFFITypes.metaffi_int64_type, MetaFFITypes.metaffi_int64_type],
+                               [MetaFFITypes.metaffi_int64_type])
+    return entity(a, b)
+
+class MyClass:
+    def __init__(self, name: str):
+        self.entity = module.load_entity("MyClass", 
+                                       [MetaFFITypes.metaffi_string8_type],
+                                       [MetaFFITypes.metaffi_handle_type])
+        self.handle = self.entity(name)
+    
+    def get_name(self) -> str:
+        entity = module.load_entity("get_name", 
+                                   [MetaFFITypes.metaffi_handle_type],
+                                   [MetaFFITypes.metaffi_string8_type])
+        return entity(self.handle)
+```
+
+### Success Criteria
+
+1. **Correct Code Generation**: Generated Python code should be syntactically correct
+2. **MetaFFI API Usage**: Code should properly use MetaFFI API
+3. **Type Safety**: Proper type annotations and conversions
+4. **Error Handling**: Robust error handling in generated code
+5. **Test Coverage**: Comprehensive test coverage
+6. **Performance**: Acceptable compilation speed
+
+This knowledge base should serve as a comprehensive guide for developing MetaFFI compiler plugins, with the Python311 implementation serving as a concrete example of these patterns and principles.
+description:
+globs:
+alwaysApply: false
+---

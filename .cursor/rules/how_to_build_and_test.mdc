@@ -1,0 +1,42 @@
+---
+description: Explains how to build and test MetaFFI CMake
+alwaysApply: false
+---
+# How to build
+In the root directory use the file build_target.py to build. Usage:
+```
+usage: build_target.py [-h] [--build-type {Debug,Release,RelWithDebInfo}] [--clean] [--list]
+                       [--verbose]
+                       [target]
+
+Build MetaFFI targets
+
+positional arguments:
+  target                Target to build
+
+options:
+  -h, --help            show this help message and exit
+  --build-type {Debug,Release,RelWithDebInfo}
+                        Build type
+  --clean               Clean build directory before building
+  --list                List all available targets
+  --verbose             Show detailed build output
+```
+You should default your build to Debug build-type.
+
+The CMake is built:
+- for windows/debug to `cmake-build-debug` directory.
+- for ubuntu/debug to `cmake-build-debug-wsl-2204` directory.
+
+MetaFFI output copied to METAFFI_HOME environment variable directory, which must be set.
+metaffi-core is built to `METAFFI_HOME`, where each plugin is built into its own directory
+
+# How to test
+Run `ctest` from root directory to test.
+- to list all tests execute `ctest --test-dir cmake-build-debug --show-only`
+- to run all tests (and stop on first failure) execute `ctest --test-dir cmake-build-debug --output-on-failure`
+- To run a specific execute `ctest --test-dir cmake-build-debug -R <regex_match_test_name> --output-on-failure`
+
+`cmake-build-debug` can be replaces with the CMake build directory.
+
+You can add the -v switch to output all tests, regarding to their failure.

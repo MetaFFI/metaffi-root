@@ -6,15 +6,32 @@
 #
 # Call this *before* the first project() or enable_language().
 
-function(escape_list input output)
-    string(REPLACE ";" "<:>" _escaped "${input}")
-    set(${output} "${_escaped}" PARENT_SCOPE)
+function(split_by_newline_charwise_sentinel input_var output_var)
+    set(input "${${input_var}}")
+    set(out "")
+    set(line "")
+    string(LENGTH "${input}" input_len)
+    set(i 0)
+    while(i LESS input_len)
+        string(SUBSTRING "${input}" ${i} 1 c)
+        if(c STREQUAL "\r")
+            # skip
+        elseif(c STREQUAL "\n")
+            set(out "${out}${line}<:NL:>")
+            set(line "")
+        else()
+            set(line "${line}${c}")
+        endif()
+        math(EXPR i "${i}+1")
+    endwhile()
+    if(NOT line STREQUAL "")
+        set(out "${out}${line}<:NL:>")
+    endif()
+    set(${output_var} "${out}" PARENT_SCOPE)
 endfunction()
 
-function(unescape_list input output)
-    string(REPLACE "<:>" ";" _unescaped "${input}")
-    set(${output} "${_unescaped}" PARENT_SCOPE)
-endfunction()
+
+
 
 macro(load_msvc_env ARCH)
     # Do nothing on non-Windows hosts
@@ -62,53 +79,46 @@ macro(load_msvc_env ARCH)
 
 		# Import each VAR=VALUE line into CMake process env
 
-		# replace all ; to \;
-		string(REPLACE ";" "\\;" _env_raw "${_env_raw}")
-
+		# Normalize newlines
 		string(REPLACE "\r\n" "\n" _env_raw "${_env_raw}")
 		string(REPLACE "\r" "\n" _env_raw "${_env_raw}")
 
-		#escape_list("${_env_raw}" _env_raw)
+		# replace ; with <:SEMICOLON:>
+		string(REPLACE ";" "<:SEMICOLON:>" _env_raw "${_env_raw}")
+		# replace \ with <:BACKSLASH:>
+		string(REPLACE "\\" "<:BACKSLASH:>" _env_raw "${_env_raw}")
 
-		string(REPLACE "\\\n" "/\n" _env_raw "${_env_raw}")
-		string(REPLACE "\n" ";" _env_lines "${_env_raw}")
-		
-		# Variables to explicitly skip (they interfere with MSVC detection)
-		set(_skip_vars LLVM_DIR)
-		
-		foreach(_line IN LISTS _env_lines)
-			# if _line starts with JAVA_HOME - print it
-			if(_line MATCHES "^JAVA_HOME=")
-				message(STATUS "JAVA_HOME: ${_line}")
+		# Find all lines of the form KEY=VALUE (excluding banner)
+		string(REGEX MATCHALL "\n([A-Za-z_0-9\\(\\)]+)=([^\n]+)" _env_pairs "${_env_raw}")
+
+		foreach(_pair IN LISTS _env_pairs)
+			# remove the leading and trailing newlines
+			string(STRIP "${_pair}" _pair)
+
+			# replace <:SEMICOLON:> with ;
+			string(REPLACE "<:SEMICOLON:>" ";" _pair "${_pair}")
+			# replace <:BACKSLASH:> with \
+			string(REPLACE "<:BACKSLASH:>" "\\" _pair "${_pair}")
+
+			# Match key and value using groups
+			string(REGEX MATCH "^([A-Za-z_0-9\\(\\)]+)=([^\n]*)$" _dummy "${_pair}")
+			set(_key "${CMAKE_MATCH_1}")
+			set(_val "${CMAKE_MATCH_2}")
+
+			# message(STATUS "Processing: PAIR: ${_pair} ||| _key: ${_key} ||| _val: ${_val}")
+
+			if(_key STREQUAL "")
+				message(FATAL_ERROR "Regex failed to extract environment variable key from: '${_pair}'")
 			endif()
-
-			string(FIND "${_line}" "=" _eq)
-			if(_eq GREATER 0)
-				string(SUBSTRING "${_line}" 0 ${_eq} _name)
-				math(EXPR _val_begin "${_eq}+1")
-				string(SUBSTRING "${_line}" ${_val_begin} -1 _value)
-				
-				# Check if we should skip this variable
-				list(FIND _skip_vars "${_name}" _skip_found)
-				if(_skip_found GREATER_EQUAL 0)
-					message(STATUS "Explicitly skipping ENV: ${_name}")
-				else()
-					# Process all variables except PATH
-					if("${_name}" STREQUAL "Path")
-						# Concatenate PATH instead of replacing
-						#unescape_list("${_value}" _value)
-						set(ENV{PATH} "${_value};$ENV{PATH}")
-					else()
-						# Set all other variables normally
-						#unescape_list("${_value}" _value)
-						set(ENV{${_name}} "${_value}")
-					endif()
-				endif()
+			string(TOUPPER "${_key}" _key_upper)
+			if(_key_upper STREQUAL "PATH")
+				set(ENV{PATH} "${_val};$ENV{PATH}")
+			else()
+				set(ENV{${_key}} "${_val}")
 			endif()
 		endforeach()
 
-		message(STATUS "PATH: $ENV{PATH}")
-
+		
 		# make sure cl.exe and rc.exe are found
 		find_program(CL_EXE NAMES cl.exe)
 		find_program(RC_EXE NAMES rc.exe)
@@ -119,8 +129,48 @@ macro(load_msvc_env ARCH)
 			message(FATAL_ERROR "rc.exe not found")
 		endif()
 
-		message(STATUS "PATH: $ENV{PATH}")
-		message(STATUS "JAVA_HOME: $ENV{JAVA_HOME}")
+		#message(STATUS "--------------------------------")
+		#message(STATUS "PATH: $ENV{PATH}")
+
+		# in INCLUDE and LIB - replace any double \\ with single \
+		string(REPLACE "\\\\" "\\" _INCLUDE "${_INCLUDE}")
+		string(REPLACE "\\\\" "\\" _LIB "${_LIB}")
+
+		#message(STATUS "INCLUDE: $ENV{INCLUDE}")
+		#message(STATUS "LIB: $ENV{LIB}")
+		#message(STATUS "LIBPATH: $ENV{LIBPATH}")
+		#message(STATUS "WindowsSdkDir: $ENV{WindowsSdkDir}")
+		#message(STATUS "VCINSTALLDIR: $ENV{VCINSTALLDIR}")
+
+		# Convert environment variables to explicit compiler and linker flags
+		# This ensures the build phase has access to all necessary paths
+		
+		# Convert INCLUDE to compiler include paths
+		if(DEFINED ENV{INCLUDE})
+			# Split the INCLUDE path and add each as a separate -I flag
+			string(REPLACE ";" ";" _include_paths "$ENV{INCLUDE}")
+			foreach(_include_path ${_include_paths})
+				add_compile_options("-I${_include_path}")
+			endforeach()
+		endif()
+		
+		# Convert LIB to linker library paths
+		if(DEFINED ENV{LIB})
+			# Split the LIB path and add each as a separate -LIBPATH flag
+			string(REPLACE ";" ";" _lib_paths "$ENV{LIB}")
+			foreach(_lib_path ${_lib_paths})
+				add_link_options("-LIBPATH:${_lib_path}")
+			endforeach()
+		endif()
+		
+		# Convert LIBPATH to additional linker library paths
+		if(DEFINED ENV{LIBPATH})
+			# Split the LIBPATH and add each as a separate -LIBPATH flag
+			string(REPLACE ";" ";" _libpath_paths "$ENV{LIBPATH}")
+			foreach(_libpath_path ${_libpath_paths})
+				add_link_options("-LIBPATH:${_libpath_path}")
+			endforeach()
+		endif()
 
 	endif()
 endmacro()

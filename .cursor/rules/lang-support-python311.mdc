@@ -1,7 +1,3 @@
----
-description: get information about Python3 language support (lang-plugin-python311)
-alwaysApply: false
----
 
 # Python Plugin (`lang-plugin-python311/`)
 
@@ -121,7 +117,7 @@ This suite validates that MetaFFI’s Python host support works end-to-end. It c
 
 ---
 
-**23. `lang-plugin-python311/compiler/` (Python Compiler Plugin)**
+**`lang-plugin-python311/compiler/` (Python Compiler Plugin)**
 
 ```md
 # Python Compiler Plugin (`lang-plugin-python311/compiler/`)
@@ -150,33 +146,152 @@ This is a **placeholder implementation**, required for consistency but typically
 
 # Python IDL Plugin (`lang-plugin-python311/idl/`)
 
-This directory implements the **IDL plugin** for Python.
+This directory implements the **IDL plugin** for Python 3.11, following MetaFFI's dynamic loading patterns and embedded code strategy.
 
 ## Purpose
 
-- Receives Python source code (or module path)
-- Parses it using `ast`, `inspect`, or dynamic loading
+- Receives Python source code (file path, module path, or package name)
+- Parses Python code using embedded Python extraction logic
 - Extracts:
-  - Function names
-  - Parameters and return types (where possible)
-  - Module/package info
+  - Functions with parameters and return types (from type annotations)
+  - Classes with methods, fields, and class variables
+  - Module/package structure and metadata
+  - Global variables and constants
 
-- Outputs **MetaFFI IDL JSON** representing Python functions or classes
+- Outputs **MetaFFI IDL JSON** representing Python entities for cross-language access
 
-## Implementation
+## Implementation Architecture
 
-- Uses the `plugin-sdk/compiler/go/IDL/` Go structs to serialize the final IDL
-- May use subprocess + `python -c` or `inspect.getmembers()` via embedding
+### Dynamic Loading Pattern
+- **No static linking**: Plugin dynamically loads Python runtime at runtime
+- **Function pointers**: Uses `load_python3_api()` to load Python symbols dynamically
+- **Self-contained**: Embeds Python extraction code as strings executed via Python C API
+- **Runtime independence**: No compile-time dependencies on Python development libraries
 
-## Limitations
+### Embedded Code Strategy
+- **Python extraction logic**: Embedded as strings in C++ code (`py_extractor.py` content)
+- **Execution via C API**: Uses `pPyRun_SimpleString()` and `pPyObject_CallObject()`
+- **No external files**: All extraction logic contained within the plugin binary
+- **Robust file handling**: Uses `importlib.util.spec_from_file_location` for arbitrary file paths
 
-- Python is dynamic — static types are not guaranteed
-- Defaults to `cdt_opaque` or `cdt_any` for unknown types
-- Can be extended with support for type annotations or runtime introspection
+### Entity Extraction Patterns
+- **File-based**: Parse single `.py` file and extract all entities
+- **Package-based**: Import Python package and extract all modules recursively
+- **Module-based**: Import specific module and extract its entities
+- **Class variables**: Extract static/class-level fields from `__dict__` analysis
+
+## Build System Integration
+
+### Output Structure
+- **Plugin output**: Built to `./python311` directory
+- **Test naming**: Uses `python311_idl_plugin_test` convention
+- **Dependencies**: Tests depend on `metaffi.idl.python311` library
+
+### CMake Configuration
+```cmake
+# IDL plugin build
+add_library(metaffi.idl.python311 SHARED
+    python_idl_plugin.cpp
+    python3_api_wrapper.cpp
+    xllr_static_capi_loader.cpp
+)
+
+# Test executable
+add_executable(python311_idl_plugin_test
+    idl_plugin_test.cpp
+    python_idl_plugin.cpp
+    python3_api_wrapper.cpp
+    xllr_static_capi_loader.cpp
+)
+```
+
+## Memory Management & Error Handling
+
+### XLLR Integration
+- **Memory allocation**: Use `xllr_alloc_string()` for all error messages
+- **Error propagation**: Return structured JSON errors for consistency
+- **Resource cleanup**: Follow Python reference counting (`Py_DECREF()`)
+
+### Error Patterns
+```cpp
+// Correct pattern
+*out_err = xllr_alloc_string(error_message.c_str(), error_message.length());
+
+// Wrong pattern (causes memory leaks)
+*out_err = strdup(error_message.c_str());
+```
+
+## Testing Strategy
+
+### Unit Testing
+- **Extraction logic**: Test Python entity extraction separately
+- **JSON generation**: Validate MetaFFI IDL JSON format compliance
+- **Type conversion**: Test Python type to MetaFFI type mapping
+- **Edge cases**: Complex types, nested structures, missing annotations
+
+### Integration Testing
+- **C interface**: Test `parse_idl()` function with doctest framework
+- **Dynamic library**: Test loading and function calls
+- **End-to-end**: Complete pipeline from Python source to JSON output
+
+### Test Scenarios
+1. **File parsing**: Single `.py` file extraction
+2. **Package parsing**: Python package/module extraction with `sys.path` management
+3. **Class variables**: Extraction of static/class-level fields
+4. **Type annotations**: Functions with explicit return type annotations
+5. **Error conditions**: Invalid files, missing dependencies, runtime errors
+
+## Key Features
+
+### Type System Support
+- **Type annotations**: Extract from `__annotations__` and function signatures
+- **Default types**: Functions without annotations return `"any"` type
+- **Complex types**: Support for `Any`, `Dict`, `List`, and other generic types
+- **Type conversion**: `py_type_to_metaffi_type()` for Python→MetaFFI type mapping
+
+### Class Support
+- **Methods**: Extract all user-defined methods (excluding dunder methods)
+- **Fields**: Extract class variables and instance fields
+- **Inheritance**: Support for class hierarchies and method resolution
+- **Properties**: Extract property decorators and their types
+
+### Package Support
+- **Module imports**: Handle `import` and `from ... import` statements
+- **Relative imports**: Support for relative import paths
+- **Package structure**: Extract complete package hierarchies
+- **Dependency management**: Handle import dependencies and circular references
+
+## Limitations & Considerations
+
+### Python Dynamic Nature
+- **Static types not guaranteed**: Python is dynamic, types may be runtime-only
+- **Default to `cdt_any`**: Unknown types default to opaque/any representation
+- **Runtime introspection**: Some type information only available at runtime
+
+### Performance Considerations
+- **Lazy initialization**: Python runtime initialized only when needed
+- **Memory efficiency**: Minimize object creation and copying
+- **Thread safety**: Handle Python GIL and concurrent access
+- **Caching**: Consider caching extracted entities for repeated access
+
+## Deployment Best Practices
+
+### Self-Contained Deployment
+- **No external dependencies**: Plugin includes all necessary runtime code
+- **Version flexibility**: Support multiple Python versions via dynamic loading
+- **Platform independence**: Handle different library names (`libpython3.11.so` vs `python311.dll`)
+
+### Debugging Support
+- **Symbol inspection**: Use `nm` and `objdump` for dynamic loading verification
+- **Runtime debugging**: Language-specific debuggers for embedded Python code
+- **Error logging**: Comprehensive error messages with context
+- **Memory profiling**: Tools like Valgrind for leak detection
 
 ## Summary
 
-This plugin enables Python code to be **called from other languages** by generating the necessary IDL from Python modules. It is essential for using Python as a guest.
+This plugin enables Python code to be **called from other languages** by generating the necessary IDL from Python modules. It follows MetaFFI's dynamic loading patterns, uses embedded code execution, and provides comprehensive entity extraction including functions, classes, and class variables. Essential for using Python as a guest language in MetaFFI.
+
+**For detailed implementation patterns and best practices, see `python311_idl_thoughts.mdc`.**
 
 (For runtime support, see `runtime/`.)
 
@@ -212,6 +327,10 @@ This directory implements the **runtime plugin** for Python. It embeds the Pytho
 - Prevents crashes on invalid input
 
 ## Summary
+
+This is a **fully embedded Python runtime plugin** that allows foreign hosts (e.g., Java, Go) to call Python code transparently. It uses the Python C API directly and manages all interpreter lifecycle, CDTS conversion, and exception handling.
+
+(For host-side Python usage, see `api/`; for IDL extraction, see `idl/`.)
 
 This is a **fully embedded Python runtime plugin** that allows foreign hosts (e.g., Java, Go) to call Python code transparently. It uses the Python C API directly and manages all interpreter lifecycle, CDTS conversion, and exception handling.
 
