@@ -1,0 +1,830 @@
+---
+description: explains how to add end-to-end tests to MetaFFI that test the complete flow from IDL generation to host wrapper compilation and execution. These tests validate that the entire MetaFFI pipeline works correctly, from guest code generation to host wrapper generation and runtime execution across any language combination.
+alwaysApply: false
+---
+# Adding End-to-End Tests to MetaFFI
+
+## Key Concepts
+
+### End-to-End Test Flow
+1. **IDL Generation**: Extract MetaFFI IDL from guest language code
+2. **Guest Compilation**: Generate guest language bindings
+3. **Host Compilation**: Generate host language wrapper code
+4. **Runtime Testing**: Execute tests using the generated host wrapper
+
+### Test Structure
+- **Build Script**: Generates both guest and host code
+- **Test Script**: Uses the generated host wrapper to test functionality
+- **Integration**: Added to the main test runner (`run_api_tests.py`)
+
+### Language Combinations
+End-to-end tests can be created for any combination of:
+- **Guest Languages**: Go, Java, C++, Python, etc.
+- **Host Languages**: Python, Java, Go, C++, etc.
+- **Test Scenarios**: Functions, classes, complex types, error handling
+
+## Step-by-Step Implementation
+
+### 1. Create Build Script
+
+Create a build script that generates both guest and host code for your specific language combination:
+
+```python
+# build_metaffi.py (example for Go guest -> Python host)
+import platform
+import os
+import subprocess
+import shlex
+import sys
+
+def run_command(command: str):
+    print(f'{command}')
+    try:
+        command_split = shlex.split(os.path.expanduser(os.path.expandvars(command)))
+        output = subprocess.run(command_split, capture_output=True, text=True)
+    except subprocess.CalledProcessError as e:
+        print(f'Failed running "{command}" with exit code {e.returncode}. Output:\n{str(e.stdout)}{str(e.stderr)}')
+        exit(1)
+    except FileNotFoundError as e:
+        print(f'Failed running {command} with {e.strerror}.\nfile: {e.filename}')
+        exit(1)
+    
+    if output.returncode != 0:
+        raise Exception(f'Failed to run {command}. Exit code: {output.returncode}. Output:\n{str(output.stdout).strip()}{str(output.stderr).strip()}')
+    
+    return str(output.stdout).strip()
+
+def main():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    # Generate both guest (-g) and host (-h) code in a single command
+    # Replace with your specific guest and host language combination
+    run_command(f'metaffi -c --idl TestRuntime.go -g -h python311')
+    # Examples for other combinations:
+    # run_command(f'metaffi -c --idl TestRuntime.java -g -h go')
+    # run_command(f'metaffi -c --idl TestRuntime.cpp -g -h java')
+    # run_command(f'metaffi -c --idl TestRuntime.py -g -h cpp')
+
+if __name__ == '__main__':
+    main()
+```
+
+### 2. Create Test Script
+
+Create a test script that uses the generated host wrapper for your specific language:
+
+```python
+# Example: test_with_generated_host_wrapper.py (Python host)
+import gc
+import platform
+import unittest
+import collections
+import sys
+
+# Import the generated host wrapper (name depends on your language combination)
+from TestRuntime_MetaFFIHost import *  # Python host wrapper
+# import TestRuntime  # Java host wrapper
+# import "testruntime"  # Go host wrapper
+
+def assert_objects_not_loaded_of_type(tc: unittest.TestCase, type_name: str):
+    gc.collect()  # Force garbage collection
+    all_objects = gc.get_objects()
+    type_name_lower = type_name.lower()
+    specific_type_objects = [obj for obj in all_objects if type_name_lower in type(obj).__name__.lower()]
+    
+    if len(specific_type_objects) > 0:
+        print(f"Found {len(specific_type_objects)} objects of type(s) containing '{type_name}'")
+        for obj in specific_type_objects:
+            print(f"Object: {obj}, Type: {type(obj).__name__}")
+        tc.fail(f"Found {len(specific_type_objects)} objects of type(s) containing '{type_name}'")
+
+class TestSanityWithGeneratedCode(unittest.TestCase):
+    
+    @classmethod
+    def setUpClass(cls):
+        # Runtime initialization depends on the host language
+        # Python: Usually auto-initialized when importing the generated module
+        # Java: May require explicit initialization
+        # Go: May require explicit setup
+        pass
+    
+    def test_hello_world(self):
+        # Test using the generated wrapper function
+        # Function names depend on your guest language and generated wrapper
+        HelloWorld()  # Python example
+        # TestRuntime.helloWorld()  # Java example
+        # HelloWorld()  # Go example
+        assert_objects_not_loaded_of_type(self, 'MetaFFIEntity')
+    
+    def test_function_with_params(self):
+        # Test function with parameters and return values
+        res = DivIntegers(1, 2)  # Python example
+        # double res = TestRuntime.divIntegers(1, 2);  # Java example
+        # res := DivIntegers(1, 2)  # Go example
+        self.assertEqual(res, 0.5, 'Expected 0.5, got: ' + str(res))
+        
+        # Test error handling
+        try:
+            DivIntegers(1, 0)
+            self.fail('Expected an error - divisor is 0')
+        except:
+            pass
+        
+        assert_objects_not_loaded_of_type(self, 'MetaFFIEntity')
+
+if __name__ == '__main__':
+    unittest.main()
+```
+
+```java
+// Example: TestWithGeneratedHostWrapper.java (Java host)
+import org.junit.Test;
+import static org.junit.Assert.*;
+
+public class TestWithGeneratedHostWrapper {
+    
+    @Test
+    public void testHelloWorld() {
+        // Test using the generated Java host wrapper
+        TestRuntime.helloWorld();
+        // Add memory leak detection if applicable
+    }
+    
+    @Test
+    public void testFunctionWithParams() {
+        double result = TestRuntime.divIntegers(1, 2);
+        assertEquals(0.5, result, 0.001);
+        
+        // Test error handling
+        try {
+            TestRuntime.divIntegers(1, 0);
+            fail("Expected an exception");
+        } catch (Exception e) {
+            // Expected
+        }
+    }
+}
+```
+
+```go
+// Example: test_with_generated_host_wrapper.go (Go host)
+package main
+
+import (
+    "testing"
+    "testruntime"  // Generated Go host wrapper
+)
+
+func TestHelloWorld(t *testing.T) {
+    testruntime.HelloWorld()
+    // Add memory leak detection if applicable
+}
+
+func TestFunctionWithParams(t *testing.T) {
+    result := testruntime.DivIntegers(1, 2)
+    if result != 0.5 {
+        t.Errorf("Expected 0.5, got %f", result)
+    }
+    
+    // Test error handling
+    defer func() {
+        if r := recover(); r == nil {
+            t.Errorf("Expected panic")
+        }
+    }()
+    testruntime.DivIntegers(1, 0)
+}
+```
+
+### 3. Fix Compiler Issues (if needed)
+
+If the host compiler has issues, you may need to fix them. The specific fixes depend on the host language compiler:
+
+#### Common Issues and Fixes
+
+**Array Type Support** (Language-specific)
+```go
+// Python compiler - In TemplateFunctions.go
+case IDL.STRING8_ARRAY:
+    fallthrough
+case IDL.STRING16_ARRAY:
+    fallthrough
+case IDL.STRING32_ARRAY:
+    res = "List[str]"
+
+// Java compiler - Add array type mappings
+case IDL.STRING8_ARRAY:
+    res = "String[]"
+
+// Go compiler - Add array type mappings  
+case IDL.STRING8_ARRAY:
+    res = "[]string"
+```
+
+**Template Syntax Issues** (Language-specific)
+```go
+// Fix method parameter generation for the specific host language
+// Python: entity(self.handle{{range $index, $param := .Parameters}}, {{$param.Name}}{{end}})
+// Java: entity(this.handle{{range $index, $param := .Parameters}}, {{$param.Name}}{{end}})
+// Go: entity(this.handle{{range $index, $param := .Parameters}}, {{$param.Name}}{{end}})
+```
+
+**Type Conversion Issues** (Language-specific)
+```go
+// Python: Use proper MetaFFI API calls
+// Before: [{{GetMetaFFITypeForAPI $param}}]
+// After:  [metaffi.metaffi_types.metaffi_type_info({{GetMetaFFITypeForAPI $param}})]
+
+// Java: Use proper type conversion
+// Before: {{GetMetaFFITypeForAPI $param}}
+// After:  MetaFFITypes.{{GetMetaFFITypeForAPI $param}}
+
+// Go: Use proper type conversion
+// Before: {{GetMetaFFITypeForAPI $param}}
+// After:  IDL.{{GetMetaFFITypeForAPI $param}}
+```
+
+**Entity Path Issues** (Universal)
+```go
+// Use correct entity path format for all languages
+// Before: "{{.Name}}"
+// After:  "callable={{.Name}}"  // for functions
+// After:  "global={{.Name}},getter"  // for global getters
+// After:  "field={{.ClassName}}.{{.Name}},instance_required,getter"  // for class fields
+```
+
+**Runtime Initialization** (Language-specific)
+```python
+# Python runtime initialization
+def initialize_runtime(target_language: str = "{{.TargetLanguage}}", module_path: str = "{{range .Modules}}{{.Name}}{{end}}_MetaFFIGuest"):
+    global runtime, module
+    if runtime is None:
+        runtime = metaffi.metaffi_runtime.MetaFFIRuntime(target_language)
+        runtime.load_runtime_plugin()
+        if platform.system() == 'Windows':
+            module = runtime.load_module(module_path + '.dll')
+        elif platform.system() == 'Linux':
+            module = runtime.load_module(module_path + '.so')
+        else:
+            raise Exception(f'Unsupported system {platform.system()}')
+    return runtime, module
+```
+
+```java
+// Java runtime initialization
+public class TestRuntime {
+    static {
+        System.loadLibrary("metaffi_runtime");
+        // Initialize runtime for specific guest language
+    }
+}
+```
+
+```go
+// Go runtime initialization
+import "C"
+
+func init() {
+    // Initialize runtime for specific guest language
+    // Load required libraries and setup
+}
+```
+
+### 4. Build the Compiler
+
+After fixing compiler issues, rebuild the target for your specific host language:
+
+```bash
+cd /path/to/MetaFFI
+python build_target.py python311  # for Python host compiler
+python build_target.py java       # for Java host compiler  
+python build_target.py go         # for Go host compiler
+python build_target.py cpp        # for C++ host compiler
+```
+
+### 5. Add to Test Runner
+
+Update `run_api_tests.py` to include the new test for your language combination:
+
+```python
+# Example: Add test for Go guest -> Python host with generated wrapper
+if is_plugin_installed('go'):
+    print(f'{Fore.MAGENTA}Testing Sanity Python3.11 -> Go (with generated Python code){Fore.RESET} - {Fore.YELLOW}RUNNING{Fore.RESET}')
+
+    # Define the paths to the scripts to be run
+    build_sanity_go_script_path = os.path.join(current_path, 'sanity', 'go', 'build_metaffi.py')
+    test_sanity_go_generated_path = os.path.join(current_path, 'sanity', 'go', 'go_test_with_generated_python_code.py')
+
+    # Run the scripts
+    run_script(build_sanity_go_script_path)
+    run_unittest(test_sanity_go_generated_path)
+
+    print(f'{Fore.MAGENTA}Testing Sanity Python3.11 -> Go (with generated Python code){Fore.RESET} - {Fore.GREEN}PASSED{Fore.RESET}')
+    os.remove(os.path.join(current_path, 'sanity', 'go', f'TestRuntime_MetaFFIGuest{get_extension_by_platform()}'))
+    os.remove(os.path.join(current_path, 'sanity', 'go', 'TestRuntime_MetaFFIHost.py'))
+
+# Example: Add test for Java guest -> Go host with generated wrapper
+if is_plugin_installed('java') and is_plugin_installed('go'):
+    print(f'{Fore.MAGENTA}Testing Sanity Go -> Java (with generated Go code){Fore.RESET} - {Fore.YELLOW}RUNNING{Fore.RESET}')
+
+    # Define the paths to the scripts to be run
+    build_sanity_java_script_path = os.path.join(current_path, 'sanity', 'java', 'build_metaffi.py')
+    test_sanity_java_generated_path = os.path.join(current_path, 'sanity', 'java', 'java_test_with_generated_go_code.go')
+
+    # Run the scripts
+    run_script(build_sanity_java_script_path)
+    run_unittest(test_sanity_java_generated_path)
+
+    print(f'{Fore.MAGENTA}Testing Sanity Go -> Java (with generated Go code){Fore.RESET} - {Fore.GREEN}PASSED{Fore.RESET}')
+    os.remove(os.path.join(current_path, 'sanity', 'java', f'TestRuntime_MetaFFIGuest{get_extension_by_platform()}'))
+    os.remove(os.path.join(current_path, 'sanity', 'java', 'TestRuntime_MetaFFIHost.go'))
+```
+
+## Testing Strategy
+
+### Test Categories
+1. **Basic Functions**: Simple function calls with no parameters
+2. **Parameter Passing**: Functions with various parameter types
+3. **Return Values**: Functions that return values
+4. **Error Handling**: Functions that throw exceptions
+5. **Complex Types**: Arrays, objects, and complex data structures
+6. **Memory Management**: Ensure proper cleanup of MetaFFI entities
+7. **Cross-Language Compatibility**: Test different guest/host language combinations
+
+### Validation Points
+- **Syntax**: Generated code compiles without errors
+- **Runtime**: Functions execute correctly
+- **Type Safety**: Parameters and return values are handled correctly
+- **Memory**: No memory leaks from MetaFFI entities
+- **Error Handling**: Exceptions are properly propagated
+- **Language Integration**: Host wrapper correctly interfaces with guest code
+
+### Language-Specific Considerations
+- **Python Host**: Use unittest framework, check for memory leaks with gc
+- **Java Host**: Use JUnit framework, check for memory leaks with System.gc()
+- **Go Host**: Use testing package, check for memory leaks with runtime.GC()
+- **C++ Host**: Use testing framework, check for memory leaks with valgrind or similar
+
+## Common Patterns
+
+### Function Testing Pattern
+```python
+# Python host example
+def test_function_name(self):
+    # Test normal operation
+    result = FunctionName(param1, param2)
+    self.assertEqual(result, expected_value)
+    
+    # Test error conditions
+    try:
+        FunctionName(invalid_param)
+        self.fail('Expected an error')
+    except:
+        pass
+    
+    # Verify cleanup
+    assert_objects_not_loaded_of_type(self, 'MetaFFIEntity')
+```
+
+```java
+// Java host example
+@Test
+public void testFunctionName() {
+    // Test normal operation
+    Object result = TestRuntime.functionName(param1, param2);
+    assertEquals(expectedValue, result);
+    
+    // Test error conditions
+    try {
+        TestRuntime.functionName(invalidParam);
+        fail("Expected an exception");
+    } catch (Exception e) {
+        // Expected
+    }
+    
+    // Verify cleanup
+    System.gc();
+    // Add memory leak detection if applicable
+}
+```
+
+```go
+// Go host example
+func TestFunctionName(t *testing.T) {
+    // Test normal operation
+    result := testruntime.FunctionName(param1, param2)
+    if result != expectedValue {
+        t.Errorf("Expected %v, got %v", expectedValue, result)
+    }
+    
+    // Test error conditions
+    defer func() {
+        if r := recover(); r == nil {
+            t.Errorf("Expected panic")
+        }
+    }()
+    testruntime.FunctionName(invalidParam)
+    
+    // Verify cleanup
+    runtime.GC()
+    // Add memory leak detection if applicable
+}
+```
+
+### Class Testing Pattern
+```python
+# Python host example
+def test_class_methods(self):
+    # Create instance
+    instance = NewClass()
+    self.assertIsNotNone(instance)
+    
+    # Test methods
+    instance.SetValue('key', 'value')
+    result = instance.GetValue('key')
+    self.assertEqual(result, 'value')
+    
+    # Verify cleanup
+    assert_objects_not_loaded_of_type(self, 'MetaFFIEntity')
+```
+
+```java
+// Java host example
+@Test
+public void testClassMethods() {
+    // Create instance
+    TestRuntime.NewClass instance = TestRuntime.newNewClass();
+    assertNotNull(instance);
+    
+    // Test methods
+    instance.setValue("key", "value");
+    Object result = instance.getValue("key");
+    assertEquals("value", result);
+    
+    // Verify cleanup
+    System.gc();
+}
+```
+
+```go
+// Go host example
+func TestClassMethods(t *testing.T) {
+    // Create instance
+    instance := testruntime.NewNewClass()
+    if instance == nil {
+        t.Fatal("Expected non-nil instance")
+    }
+    
+    // Test methods
+    instance.SetValue("key", "value")
+    result := instance.GetValue("key")
+    if result != "value" {
+        t.Errorf("Expected value, got %v", result)
+    }
+    
+    // Verify cleanup
+    runtime.GC()
+}
+```
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Template Syntax Errors**
+   - Check for malformed template expressions
+   - Verify parameter generation logic
+   - Ensure proper escaping of special characters
+
+2. **Type Conversion Errors**
+   - Use `metaffi.metaffi_types.metaffi_type_info()` wrapper
+   - Verify array type support
+   - Check entity path formats
+
+3. **Runtime Errors**
+   - Verify module loading paths
+   - Check platform-specific file extensions
+   - Ensure runtime plugin is loaded
+
+4. **Memory Leaks**
+   - Use `assert_objects_not_loaded_of_type()` to verify cleanup
+   - Check for proper entity release
+   - Verify destructor calls
+
+### Debugging Steps
+
+1. **Check Generated Code**: Examine the generated host wrapper for syntax errors
+2. **Verify Compiler**: Ensure the host compiler is built with latest changes
+3. **Test Incrementally**: Test individual functions before complex scenarios
+4. **Compare with Working Tests**: Use existing working tests as reference
+5. **Check Logs**: Look for runtime error messages and stack traces
+
+## Best Practices
+
+1. **Modular Design**: Separate build and test scripts
+2. **Comprehensive Testing**: Test all function signatures and edge cases
+3. **Cleanup Verification**: Always verify proper resource cleanup
+4. **Error Handling**: Test both success and failure scenarios
+5. **Platform Independence**: Ensure tests work on all supported platforms
+6. **Documentation**: Document any compiler fixes or workarounds
+7. **Language Agnostic**: Design tests that can be adapted for different language combinations
+8. **Consistent Patterns**: Use consistent naming and structure across different language tests
+9. **Incremental Testing**: Test individual components before complex scenarios
+10. **Cross-Platform Validation**: Test on multiple operating systems when possible
+
+## Integration Guidelines
+
+1. **Naming Convention**: Use descriptive names for test files (e.g., `{guest_lang}_test_with_generated_{host_lang}_code.{ext}`)
+2. **Directory Structure**: Follow existing test organization patterns in `sanity/{language}/` directories
+3. **Dependencies**: Ensure all required plugins are installed for both guest and host languages
+4. **Cleanup**: Remove generated files after tests complete
+5. **Reporting**: Provide clear success/failure messages with language combination context
+6. **Plugin Checks**: Verify both guest and host language plugins are available before running tests
+7. **File Extensions**: Use appropriate file extensions for each language (`.py`, `.java`, `.go`, `.cpp`)
+
+## Language Combination Examples
+
+### Supported Combinations
+- **Go Guest → Python Host**: `metaffi -c --idl TestRuntime.go -g -h python311`
+- **Java Guest → Go Host**: `metaffi -c --idl TestRuntime.java -g -h go`
+- **Python Guest → Java Host**: `metaffi -c --idl TestRuntime.py -g -h java`
+- **C++ Guest → Python Host**: `metaffi -c --idl TestRuntime.cpp -g -h python311`
+- **Go Guest → Java Host**: `metaffi -c --idl TestRuntime.go -g -h java`
+- **Java Guest → C++ Host**: `metaffi -c --idl TestRuntime.java -g -h cpp`
+
+### Test File Naming Examples
+- `go_test_with_generated_python_code.py`
+- `java_test_with_generated_go_code.go`
+- `python_test_with_generated_java_code.java`
+- `cpp_test_with_generated_python_code.py`
+
+This guide provides a comprehensive framework for adding end-to-end tests to MetaFFI across any language combination, ensuring that the complete pipeline from IDL generation to runtime execution works correctly for all supported guest and host languages.
+
+## Advanced End-to-End Testing Patterns
+
+### IDL Plugin to Host Compiler Flow
+
+When testing the complete MetaFFI pipeline from IDL generation to host compilation, the flow is:
+
+```
+Guest Code → IDL Plugin → MetaFFI IDL → Host Compiler → Generated Host Code → Test
+```
+
+**Key Insights from OpenJDK → Python311 Implementation:**
+
+#### 1. Build Script Pattern for IDL Plugin Testing
+```python
+# build_metaffi.py - For IDL plugin testing
+def main():
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+    # Use --idl-plugin to specify the IDL plugin
+    # Use --idl to specify the input directory/file
+    # Use -h to specify the host language
+    run_command(f'metaffi -c --idl-plugin openjdk --idl sanity/ -h python311')
+    
+    # Examples for other IDL plugins:
+    # run_command(f'metaffi -c --idl-plugin python311 --idl sanity/ -h java')
+    # run_command(f'metaffi -c --idl-plugin go --idl sanity/ -h python311')
+    # run_command(f'metaffi -c --idl-plugin cpp --idl sanity/ -h go')
+```
+
+#### 2. Generated Code Import Strategy
+```python
+# Test file pattern for IDL plugin generated code
+try:
+    # Import the generated code from IDL plugin
+    from sanity import TestRuntime, TestMap  # Generated from Java classes
+    # from python_module import TestRuntime  # Generated from Python classes
+    # from go_module import TestRuntime      # Generated from Go classes
+except ImportError as e:
+    print(f"Warning: Generated code not found. Run build script first. Error: {e}")
+    # Create dummy classes for testing structure
+    class TestRuntime:
+        def hello_world(self): pass
+        # ... other methods
+```
+
+#### 3. High-Level Interface Testing
+```python
+# Test using generated high-level interface (not direct MetaFFI API)
+class TestSanityWithGeneratedCode(unittest.TestCase):
+    def setUp(self):
+        # Initialize using generated classes
+        self.test_runtime = TestRuntime()  # Generated constructor
+    
+    def test_hello_world(self):
+        # Use generated method interface
+        self.test_runtime.hello_world()  # Clean, high-level call
+        
+        # Instead of low-level MetaFFI API:
+        # hello_world = test_runtime_module.load_entity('class=sanity.TestRuntime,callable=helloWorld', None, None)
+        # hello_world()
+    
+    def test_class_instantiation(self):
+        # Test generated class constructors
+        test_map = TestMap()  # Generated constructor
+        test_map.set('key', 'value')  # Generated method
+        result = test_map.get('key')  # Generated method
+        self.assertEqual(result, 'value')
+```
+
+#### 4. Property and Method Testing
+```python
+def test_properties_and_methods(self):
+    # Test generated properties
+    five_seconds = self.test_runtime.five_seconds  # Generated property
+    self.assertEqual(five_seconds, 5)
+    
+    # Test generated methods with parameters
+    result = self.test_runtime.div_integers(1, 2)  # Generated method
+    self.assertEqual(result, 0.5)
+    
+    # Test error handling in generated code
+    try:
+        self.test_runtime.returns_an_error()  # Generated method
+        self.fail('Expected an error')
+    except Exception:
+        pass  # Expected
+```
+
+### Test Runner Automation
+
+#### Complete Test Runner Pattern
+```python
+# run_e2e_test.py - Automated test runner
+def main():
+    print("🚀 Starting End-to-End Test")
+    
+    # Step 1: Build the MetaFFI code
+    print("📦 Step 1: Building MetaFFI code...")
+    if not run_command("python build_metaffi.py", "Building MetaFFI code"):
+        print("❌ Failed to build MetaFFI code. Exiting.")
+        return 1
+    
+    # Step 2: Check if generated files exist
+    print("🔍 Step 2: Checking generated files...")
+    if not check_generated_files():
+        print("❌ Generated files not found. Exiting.")
+        return 1
+    
+    # Step 3: Run the end-to-end test
+    print("🧪 Step 3: Running end-to-end test...")
+    if not run_command("python test_with_generated_code.py", "Running end-to-end test"):
+        print("❌ End-to-end test failed. Exiting.")
+        return 1
+    
+    print("🎉 All tests completed successfully!")
+    return 0
+```
+
+#### Generated File Validation
+```python
+def check_generated_files():
+    """Check if the generated files exist"""
+    expected_files = [
+        'sanity.py',           # Main module file
+        'sanity/__init__.py',  # Package initialization
+        'sanity/TestRuntime.py', # Generated class
+        'sanity/TestMap.py'    # Generated class
+    ]
+    
+    missing_files = []
+    for file_path in expected_files:
+        if not os.path.exists(file_path):
+            missing_files.append(file_path)
+    
+    if missing_files:
+        print(f"❌ Missing generated files: {missing_files}")
+        return False
+    
+    print("✅ All expected generated files found")
+    return True
+```
+
+### Error Handling and Graceful Degradation
+
+#### Import Error Handling
+```python
+# Graceful handling of missing generated code
+try:
+    from sanity import TestRuntime, TestMap
+except ImportError as e:
+    print(f"Warning: Generated code not found. Run 'python build_metaffi.py' first. Error: {e}")
+    # Create dummy classes for testing structure
+    class TestRuntime:
+        def hello_world(self): pass
+        def returns_an_error(self): pass
+        # ... other methods with pass statements
+    
+    class TestMap:
+        def __init__(self): pass
+        def set(self, key, value): pass
+        # ... other methods with pass statements
+```
+
+#### Test Structure Validation
+```python
+def test_structure_validation(self):
+    """Test that the generated code has the expected structure"""
+    # Verify generated classes exist and have expected methods
+    self.assertTrue(hasattr(TestRuntime, 'hello_world'))
+    self.assertTrue(hasattr(TestRuntime, 'div_integers'))
+    self.assertTrue(hasattr(TestMap, 'set'))
+    self.assertTrue(hasattr(TestMap, 'get'))
+    
+    # Verify properties exist
+    self.assertTrue(hasattr(TestRuntime, 'five_seconds'))
+    self.assertTrue(hasattr(TestMap, 'name'))
+```
+
+### Documentation and Maintenance
+
+#### Comprehensive README Pattern
+```markdown
+# End-to-End Tests
+
+## Test Flow
+1. **IDL Plugin**: Analyzes guest language code and generates MetaFFI IDL
+2. **Host Compiler**: Takes MetaFFI IDL and generates host language code
+3. **Generated Code**: Provides high-level interface to guest language
+4. **Test**: Uses generated code to validate functionality
+
+## Running Tests
+```bash
+# Quick start
+python run_e2e_test.py
+
+# Step by step
+python build_metaffi.py
+python test_with_generated_code.py
+```
+
+## Expected Generated Files
+- `sanity.py` - Main module file
+- `sanity/__init__.py` - Package initialization
+- `sanity/TestRuntime.py` - Generated TestRuntime class
+- `sanity/TestMap.py` - Generated TestMap class
+
+## Troubleshooting
+- **Generated files not found**: Run build script first
+- **Import errors**: Check that host compiler is properly installed
+- **Runtime errors**: Verify guest language code is compatible
+```
+
+### Key Differences from Direct API Testing
+
+#### Direct API Test vs Generated Code Test
+```python
+# Direct API Test (openjdk_test.py)
+def test_hello_world(self):
+    global test_runtime_module
+    hello_world = test_runtime_module.load_entity('class=sanity.TestRuntime,callable=helloWorld', None, None)
+    hello_world()
+    del hello_world
+    assert_objects_not_loaded_of_type(self, 'MetaFFIEntity')
+
+# Generated Code Test (openjdk_test_with_compiler.py)
+def test_hello_world(self):
+    self.test_runtime.hello_world()  # Clean, high-level interface
+    del self.test_runtime
+    assert_objects_not_loaded_of_type(self, 'MetaFFIEntity')
+```
+
+#### Benefits of Generated Code Testing
+1. **Higher-Level Interface**: Clean, language-native API
+2. **Type Safety**: Generated code provides proper type annotations
+3. **IDE Support**: Better autocomplete and error detection
+4. **Maintainability**: Easier to understand and modify
+5. **Documentation**: Generated code serves as API documentation
+6. **Error Handling**: Built-in error handling in generated code
+7. **Performance**: Optimized generated code vs. dynamic API calls
+
+### Testing Strategy for IDL Plugin Pipeline
+
+#### Test Categories for IDL Plugin Testing
+1. **Basic Functions**: Simple function calls with no parameters
+2. **Parameter Passing**: Functions with various parameter types
+3. **Return Values**: Functions that return values
+4. **Error Handling**: Functions that throw exceptions
+5. **Class Methods**: Instance and static methods
+6. **Properties**: Field getters and setters
+7. **Constructors**: Object instantiation
+8. **Complex Types**: Arrays, objects, and complex data structures
+9. **Memory Management**: Ensure proper cleanup of generated objects
+10. **Cross-Language Compatibility**: Test different guest/host language combinations
+
+#### Validation Points for IDL Plugin Testing
+- **IDL Generation**: IDL plugin correctly analyzes guest code
+- **Host Compilation**: Host compiler generates valid code
+- **Syntax**: Generated code compiles without errors
+- **Runtime**: Functions execute correctly
+- **Type Safety**: Parameters and return values are handled correctly
+- **Memory**: No memory leaks from generated objects
+- **Error Handling**: Exceptions are properly propagated
+- **Language Integration**: Generated code correctly interfaces with guest code
+- **API Design**: Generated code provides clean, intuitive interface
+
+This advanced testing pattern ensures that the complete MetaFFI pipeline from IDL generation to host compilation works correctly, providing confidence in the entire system's functionality.
+description:
+globs:
+alwaysApply: false
+---

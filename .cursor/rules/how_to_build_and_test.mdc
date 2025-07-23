@@ -1,6 +1,5 @@
 ---
-description: Explains how to build and test MetaFFI CMake
-alwaysApply: false
+alwaysApply: true
 ---
 # How to build
 In the root directory use the file build_target.py to build. Usage:

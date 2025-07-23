@@ -1,3 +1,7 @@
+---
+description: Explaining how to build MetaFFI plugin for python311 and information about compiler plugin
+alwaysApply: false
+---
 # MetaFFI Compiler Plugin Development Knowledge Base
 
 ## Overview

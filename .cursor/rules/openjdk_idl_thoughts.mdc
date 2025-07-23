@@ -1,0 +1,401 @@
+---
+description: OpenJDK IDL plugin thoughts and implementation
+alwaysApply: false
+---
+# OpenJDK IDL Plugin Implementation Knowledge Base
+
+## Current Status (Last Updated: Current Session)
+
+### 🎉 Major Success: OpenJDK IDL Plugin Fully Functional!
+
+The OpenJDK IDL plugin is now **COMPLETELY WORKING** and successfully extracts MetaFFI IDL from Java bytecode with comprehensive feature support:
+
+#### ✅ **Successfully Tested Features:**
+1. **Basic Classes**: Simple fields, methods, constructors
+2. **Static Methods**: Extracted as functions in MetaFFI IDL
+3. **Instance Methods**: Extracted as methods with proper instance parameters
+4. **Constructors**: Multiple constructors with different parameter types
+5. **Field Access**: Getters and setters for public fields
+6. **Constants**: Static final fields extracted as constants
+7. **Arrays**: `int[]` → `INT32_ARRAY` with proper dimensions
+8. **Complex Types**: `java.util.List`, `java.util.Map` → `HANDLE` with type aliases
+9. **Nested Classes**: `ComplexTest$ComplexResult` → `HANDLE` with type alias
+10. **Type Mapping**: All Java types correctly mapped to MetaFFI types
+11. **Package Structure**: Proper module and package paths in entity_path
+12. **JNI Integration**: Robust C++ plugin with comprehensive error handling
+
+### ✅ Completed
+1. **Java JSON Generation**: All data model classes (`JavaInfo`, `ClassInfo`, `MethodInfo`, `ParameterInfo`, `VariableInfo`) have `toMetaFFIJSON()` methods implemented
+2. **BytecodeExtractor**: Full ASM-based bytecode extraction implemented with comprehensive field, method, constructor, and type extraction
+3. **JarExtractor**: Complete JAR file processing with package filtering support
+4. **JUnit Tests**: Comprehensive test suite for BytecodeExtractor covering:
+   - Basic extraction correctness
+   - JSON generation validation
+   - Static methods and constants
+   - Complex types and arrays
+   - Enums and nested classes
+   - Void methods and primitive types
+   - Non-public class filtering
+   - JSON schema compliance
+5. **Test Data**: SimpleTest.java and ComplexTest.java with various Java features
+6. **Build System**: CMakeLists.txt configured with Java compilation and test integration
+7. **File Structure**: Clean organization with src/, test/, and libs/ directories
+8. **C++ JNI Integration**: ✅ **COMPLETED** - Plugin implementation with JNI wrapper working correctly
+9. **Integration Testing**: ✅ **COMPLETED** - C++ test passing with successful Java extraction and JSON generation
+
+### 🔄 In Progress
+1. **✅ Testing with ComplexTest**: ✅ **COMPLETED** - Complex Java features working perfectly
+2. **JAR File Testing**: Test JAR file processing functionality
+
+### ✅ **All Tests Passing**
+- **Java Unit Tests**: `openjdk_idl_plugin_java_tests` ✅ PASSING
+- **C++ Integration Tests**: `openjdk_idl_plugin_cpp_test` ✅ PASSING
+- **Complete Test Suite**: 100% tests passed, 0 tests failed
+
+### ❌ Issues Encountered
+1. **~~C++ Test Failure~~**: ✅ **RESOLVED** - Fixed JNI classpath and error handling
+2. **~~Build Directory~~**: ✅ **RESOLVED** - Test data compilation working correctly
+3. **~~JNI Integration~~**: ✅ **RESOLVED** - Java class loading and method calling working
+
+### 🎯 Next Steps
+1. **✅ Debug C++ Integration**: JNI calls now working correctly
+2. **✅ Verify Java Class Loading**: Java classes properly loaded in C++ environment
+3. **✅ Test Data Verification**: .class files properly compiled and accessible
+4. **✅ Error Handling**: Improved error reporting in C++ plugin with detailed JNI exception handling
+5. **✅ Complete Integration**: C++ test passing with real Java extraction and JSON generation
+6. **✅ Test ComplexTest**: ✅ **COMPLETED** - ComplexTest.java with advanced features working perfectly
+7. **Test JAR Processing**: Test JAR file extraction functionality
+8. **Integration with MetaFFI CLI**: Test the plugin with the main MetaFFI CLI tool
+
+### 📁 Current File Structure
+```
+lang-plugin-openjdk/idl/
+├── CMakeLists.txt                    ✅ Configured
+├── openjdk_idl_plugin.cpp           ✅ Complete with JNI integration
+├── openjdk_idl_plugin_test.cpp      ✅ Working test
+├── src/
+│   └── java_extractor/
+│       ├── BytecodeExtractor.java   ✅ Complete
+│       ├── JarExtractor.java        ✅ Complete
+│       ├── JavaInfo.java            ✅ Complete
+│       ├── ClassInfo.java           ✅ Complete
+│       ├── MethodInfo.java          ✅ Complete
+│       ├── ParameterInfo.java       ✅ Complete
+│       └── VariableInfo.java        ✅ Complete
+├── test/
+│   ├── java_extractor/
+│   │   └── BytecodeExtractorTest.java ✅ Complete
+│   └── testdata/
+│       ├── SimpleTest.java          ✅ Complete
+│       └── ComplexTest.java         ✅ Complete
+└── libs/                            ✅ Dependencies
+```
+
+## Overview
+
+The OpenJDK IDL plugin extracts MetaFFI IDL from Java bytecode (`.class` files) and JAR files, supporting compiled code from Java, Groovy, Scala, Kotlin, and other JVM languages. The plugin focuses on concrete, public entities that can be used for cross-language interoperability.
+
+## Architecture
+
+### Current State
+- **Java Extraction Infrastructure**: Existing extractors for `.class`, `.jar`, and `.java` files
+- **Go Plugin**: Current implementation using CGo to call Java modules
+- **Data Models**: `JavaInfo`, `ClassInfo`, `MethodInfo`, `ParameterInfo`, `VariableInfo`
+
+### Target Architecture
+- **C++ Plugin**: Direct JNI implementation (recommended over CGo)
+- **Java JSON Generation**: All IDL conversion logic in Java
+- **Flat File Structure**: Consistent with other MetaFFI plugins
+- **Comprehensive Testing**: JUnit tests + C++ integration tests
+
+## Entity Extraction Rules
+
+### ✅ Extract (Concrete, Public Entities)
+- **Classes**: Java classes, enums, records, sealed classes, annotation classes
+- **Static Methods**: As functions in MetaFFI IDL
+- **Instance Methods**: As methods in MetaFFI IDL
+- **Constructors**: As constructors in MetaFFI IDL
+- **Public Fields**: As fields with getters/setters
+- **Static Final Fields**: As constants (fields with only getters)
+- **Lambda Expressions**: As functions
+
+### ❌ Do NOT Extract (Non-Concrete/Generic)
+- **Interfaces**: Not concrete, cannot be instantiated
+- **Abstract Classes**: Not concrete, cannot be instantiated
+- **Generics**: `Optional<T>`, `Stream<T>`, `List<T>` (not concrete)
+- **Private/Protected Entities**: Not accessible from outside
+
+## Type Mapping
+
+### Primitive Types
+```java
+// Java → MetaFFI
+int → INT32
+long → INT64
+float → FLOAT32
+double → FLOAT64
+boolean → BOOL
+byte → INT8
+short → INT16
+char → INT16
+String → STRING8
+```
+
+### Complex Types
+```java
+// Java → MetaFFI
+Object → HANDLE
+List<String> → HANDLE (type_alias: "List<String>")
+Map<String, Integer> → HANDLE (type_alias: "Map<String, Integer>")
+CustomClass → HANDLE (type_alias: "com.example.CustomClass")
+```
+
+### Arrays
+```java
+// Java → MetaFFI
+int[] → INT32_ARRAY
+String[] → STRING8_ARRAY
+Object[] → HANDLE_ARRAY
+```
+
+## Entity Path Format
+
+### JSON Schema Structure
+```json
+{
+  "entity_path": {
+    "module": "fully.qualified.ClassName",
+    "package": "fully.qualified"
+  }
+}
+```
+
+### Examples
+- Class: `"module": "org.apache.logging.log4j.LogManager"`
+- Method: `"module": "org.apache.logging.log4j.Logger"`
+- Constructor: `"module": "sanity.TestMap"`
+
+### MetaFFI Load Entity Format
+```python
+# Static method
+'class=org.apache.logging.log4j.LogManager,callable=getLogger'
+
+# Instance method
+'class=org.apache.logging.log4j.Logger,callable=error,instance_required'
+
+# Constructor
+'class=sanity.TestMap,callable=<init>'
+
+# Field getter
+'class=sanity.TestMap,field=name,instance_required,getter'
+```
+
+## JAR File Processing
+
+### Path Filtering Format
+```
+"jarfile.jar:package1;package2"
+```
+
+### Examples
+```java
+// Extract specific packages from JAR
+"log4j-api-2.21.1.jar:org/apache/logging/log4j/LogManager;org/apache/logging/log4j/Logger"
+
+// Extract all public classes from JAR
+"myapp.jar"
+```
+
+### Processing Logic
+1. Parse JAR filename and package paths
+2. Iterate through JAR entries
+3. Filter by package paths (if specified)
+4. Extract only public classes
+5. Skip META-INF and inner classes (configurable)
+
+## Implementation Plan
+
+### Phase 1: Java JSON Generation
+1. **Add JSON Generation Method**: `JavaInfo.toMetaFFIJSON()`
+2. **Type Conversion Logic**: Java type to MetaFFI type mapping
+3. **Entity Path Generation**: Proper module/package structure
+4. **Error Handling**: Exceptions for invalid data
+
+### Phase 2: C++ Plugin Implementation
+1. **JNI Wrapper**: Load Java classes and call extractors
+2. **Plugin Interface**: Single `parse_idl` function
+3. **Error Handling**: Catch Java exceptions and return error strings
+4. **Memory Management**: Proper JNI cleanup
+
+### Phase 3: Testing Infrastructure
+1. **JUnit Tests**: Comprehensive unit tests for Java extractors
+2. **Test Data**: Java, Groovy, Scala, Kotlin source files
+3. **Integration Tests**: C++ plugin with real files
+4. **Build Scripts**: Compile test files from multiple languages
+
+### Phase 4: CMake Integration
+1. **Flat Structure**: Consistent with other plugins
+2. **Java Compilation**: Build Java extractors
+3. **C++ Compilation**: Build plugin library
+4. **Test Integration**: Add to CTest
+
+## File Structure
+
+```
+lang-plugin-openjdk/idl/
+├── CMakeLists.txt
+├── openjdk_idl_plugin.cpp
+├── java_extractor_wrapper.cpp
+├── openjdk_idl_plugin_test.cpp
+├── JavaExtractor.java
+├── BytecodeExtractor.java
+├── JarExtractor.java
+├── JavaInfo.java
+├── ClassInfo.java
+├── MethodInfo.java
+├── ParameterInfo.java
+├── VariableInfo.java
+├── Extractor.java
+├── test/
+│   ├── BytecodeExtractorTest.java
+│   ├── JarExtractorTest.java
+│   ├── JavaExtractorTest.java
+│   └── testdata/
+│       ├── java/
+│       ├── groovy/
+│       ├── scala/
+│       ├── kotlin/
+│       └── jars/
+└── src/
+    ├── SimpleTest.java
+    ├── ComplexTest.java
+    ├── SimpleTest.groovy
+    ├── ComplexTest.groovy
+    ├── SimpleTest.scala
+    ├── ComplexTest.scala
+    ├── SimpleTest.kt
+    └── ComplexTest.kt
+```
+
+## Test Scenarios
+
+### Language Features to Test
+1. **Basic Classes**: Simple fields and methods
+2. **Inheritance**: Class hierarchies and method overriding
+3. **Nested Classes**: Static and non-static nested classes
+4. **Enums**: Enum classes with methods and fields
+5. **Records**: Data classes (Java 14+)
+6. **Sealed Classes**: Restricted inheritance (Java 17+)
+7. **Annotations**: Annotation classes
+8. **Generics**: Concrete generic usage (not raw types)
+9. **Lambda Expressions**: Functional interfaces
+10. **Arrays**: Single and multi-dimensional arrays
+
+### JAR Testing
+1. **Single Class JAR**: Basic functionality
+2. **Multi-Package JAR**: Complex package structure
+3. **Path Filtering**: Extract specific packages
+4. **Dependencies**: JARs with external dependencies
+5. **Inner Classes**: JARs with nested classes
+
+### Error Cases
+1. **Invalid Files**: Corrupted class files
+2. **Missing Dependencies**: Classes with unresolved references
+3. **Non-Public Classes**: Should be filtered out
+4. **Synthetic Methods**: Should be filtered out
+5. **Abstract Classes**: Should be filtered out
+
+## Plugin Interface
+
+### C++ Entry Point
+```cpp
+extern "C" {
+    int parse_idl(const char* source_code, const char* file_path, 
+                  char** out_idl_json, char** out_err);
+}
+```
+
+### Java JSON Generation
+```java
+public String toMetaFFIJSON() throws Exception {
+    // Convert JavaInfo to MetaFFI IDL JSON
+    // Handle all entity types and type mapping
+    // Generate proper entity paths
+    // Return JSON string or throw exception
+}
+```
+
+## Key Implementation Details
+
+### JNI Integration
+- Load Java classes via JNI
+- Call Java extractors and JSON generation
+- Handle exceptions and convert to error strings
+- Proper memory management and cleanup
+
+### Type System
+- Map Java primitives to MetaFFI primitives
+- Map complex types to HANDLE with type aliases
+- Handle arrays and multi-dimensional arrays
+- Support custom type aliases for complex types
+
+### Entity Extraction
+- Filter by public access modifiers
+- Skip synthetic and bridge methods
+- Handle method overloading with overload indices
+- Extract constructors and instance methods separately
+
+### Performance Considerations
+- Efficient JAR processing with streaming
+- Minimal object creation in hot paths
+- Proper resource cleanup
+- Caching of frequently accessed data
+
+## Success Criteria
+
+1. **Correctness**: Generated JSON conforms to MetaFFI IDL schema
+2. **Completeness**: All public, concrete entities extracted
+3. **Accuracy**: Proper type mapping and entity paths
+4. **Performance**: Efficient processing of large JARs
+5. **Reliability**: Robust error handling and recovery
+6. **Test Coverage**: >90% code coverage with comprehensive scenarios
+7. **Integration**: Seamless integration with MetaFFI CLI and build system
+
+## Common Patterns
+
+### Entity Path Generation
+```java
+private String generateEntityPath(String className, String packageName) {
+    return String.format("{\"module\":\"%s\",\"package\":\"%s\"}", 
+                        className, packageName);
+}
+```
+
+### Type Mapping
+```java
+private String mapJavaTypeToMetaFFI(String javaType) {
+    switch (javaType) {
+        case "int": return "INT32";
+        case "String": return "STRING8";
+        default: return "HANDLE";
+    }
+}
+```
+
+### Error Handling
+```java
+public String toMetaFFIJSON() throws RuntimeException {
+    try {
+        // JSON generation logic
+        return jsonString;
+    } catch (Exception e) {
+        throw new RuntimeException("Failed to generate MetaFFI JSON: " + e.getMessage());
+    }
+}
+```
+
+This knowledge base serves as a comprehensive guide for implementing the OpenJDK IDL plugin, ensuring consistency with MetaFFI's architecture and requirements.
+description:
+globs:
+alwaysApply: false
+---
