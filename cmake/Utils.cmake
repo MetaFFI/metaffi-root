@@ -128,3 +128,20 @@ function(get_dir_sources DIR OUT_VAR)
 	set(${OUT_VAR} "${tmp}" PARENT_SCOPE)
 endfunction()
 #-----------------------------------------------------------------------------------------------
+# Downloads a file from URL if it doesn't exist at the given path
+# Sets VAR_NAME to FILE_PATH, and downloads from URL if file doesn't exist
+function(if_exists_or_download VAR_NAME FILE_PATH URL)
+	set(${VAR_NAME} ${FILE_PATH} PARENT_SCOPE)
+	
+	if(NOT EXISTS ${FILE_PATH})
+		get_filename_component(FILENAME ${FILE_PATH} NAME)
+		message(STATUS "Downloading ${FILENAME}...")
+		file(DOWNLOAD
+			${URL}
+			${FILE_PATH}
+			SHOW_PROGRESS
+			TLS_VERIFY ON
+		)
+	endif()
+endfunction()
+#-----------------------------------------------------------------------------------------------

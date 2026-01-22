@@ -67,11 +67,22 @@ endmacro()
 # copies the executable to PATH with CMAKE_INSTALL_PREFIX as the root
 # sets the target name to the variable TARGET_NAME
 # Optional: SKIP_DEPS - if set to TRUE, skips copying dependencies
+# Optional: INCLUDE_IN_ALL - if set to TRUE, includes target in ALL
 macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
-	cmake_parse_arguments(ARG "SKIP_DEPS" "" "" ${ARGN})
+	cmake_parse_arguments(ARG "SKIP_DEPS;INCLUDE_IN_ALL" "" "" ${ARGN})
+
+	if(IS_ABSOLUTE "${COPYPATH}")
+		set(CPP_COPY_DEST "${COPYPATH}")
+	else()
+		set(CPP_COPY_DEST "$ENV{METAFFI_HOME}/${COPYPATH}")
+	endif()
 	
 	add_executable(${TARGET_NAME} ${SOURCE})
-	set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+	if(ARG_INCLUDE_IN_ALL)
+		set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL FALSE)
+	else()
+		set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+	endif()
 	if(UNIX)
 		# Set RPATH properties for executables on Unix
 		set_target_properties(${TARGET_NAME} PROPERTIES
@@ -86,23 +97,24 @@ macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 		target_link_libraries(${TARGET_NAME} PRIVATE ${LIB})
 	endforeach()
 
-	# Copy the executable to the target directory
-	add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-			COMMAND ${CMAKE_COMMAND} -E echo "Going to copy $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}:"
-			COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${TARGET_NAME}> $ENV{METAFFI_HOME}/${COPYPATH}
-			COMMAND ${CMAKE_COMMAND} -E echo "Copied $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}"
-	)
+        # Copy the executable to the target directory
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                        COMMAND ${CMAKE_COMMAND} -E echo "Going to copy $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}:"
+                        COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_COPY_DEST}
+                        COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${TARGET_NAME}> ${CPP_COPY_DEST}
+                        COMMAND ${CMAKE_COMMAND} -E echo "Copied $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
+        )
 
 	if(NOT ARG_SKIP_DEPS)
 		# Conditional logic based on OS
 		if(WIN32)
 			# Windows: Use TARGET_RUNTIME_DLLS
 			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-					COMMAND ${CMAKE_COMMAND} -E echo "Going to Copy dependencies of $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}. Deps: $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>"
+					COMMAND ${CMAKE_COMMAND} -E echo "Going to Copy dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}. Deps: $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>"
 					COMMAND ${CMAKE_COMMAND} -E copy_if_different
 					$<TARGET_RUNTIME_DLLS:${TARGET_NAME}>
-					$ENV{METAFFI_HOME}/${COPYPATH}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}"
+					${CPP_COPY_DEST}
+					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
 					COMMAND_EXPAND_LISTS
 			)
 		elseif(UNIX AND NOT APPLE)
@@ -115,8 +127,8 @@ macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 					COMMAND ${CMAKE_COMMAND} -E echo "Detected dependencies:"
 					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} echo {}
 					COMMAND ${CMAKE_COMMAND} -E echo "Copying dependencies:"
-					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} ${CMAKE_COMMAND} -E copy_if_different {} $ENV{METAFFI_HOME}/${COPYPATH}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}"
+					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} ${CMAKE_COMMAND} -E copy_if_different {} ${CPP_COPY_DEST}
+					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
 			)
 		else()
 			# Unsupported OS: Fail the configuration
@@ -128,10 +140,20 @@ endmacro()
 
 # same as c_cpp_exe but for a shared library
 macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
-	cmake_parse_arguments(ARG "SKIP_DEPS" "" "" ${ARGN})
+	cmake_parse_arguments(ARG "SKIP_DEPS;INCLUDE_IN_ALL" "" "" ${ARGN})
+
+	if(IS_ABSOLUTE "${COPYPATH}")
+		set(CPP_COPY_DEST "${COPYPATH}")
+	else()
+		set(CPP_COPY_DEST "$ENV{METAFFI_HOME}/${COPYPATH}")
+	endif()
 	
 	add_library(${TARGET_NAME} SHARED ${SOURCE})
-	set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+	if(ARG_INCLUDE_IN_ALL)
+		set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL FALSE)
+	else()
+		set_target_properties(${TARGET_NAME} PROPERTIES EXCLUDE_FROM_ALL TRUE)
+	endif()
 	if(WIN32)
 		set_target_properties(${TARGET_NAME} PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 	elseif(UNIX)
@@ -151,10 +173,10 @@ macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 	# copy using POST-BUILD the target to METAFFI_HOME/PATH
 	# and print a message of the copy
 	add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-		COMMAND ${CMAKE_COMMAND} -E echo "Going to copy $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}"
-		COMMAND ${CMAKE_COMMAND} -E make_directory $ENV{METAFFI_HOME}/${COPYPATH}
-		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${TARGET_NAME}> $ENV{METAFFI_HOME}/${COPYPATH}
-		COMMAND ${CMAKE_COMMAND} -E echo "Copied $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}"
+		COMMAND ${CMAKE_COMMAND} -E echo "Going to copy $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
+		COMMAND ${CMAKE_COMMAND} -E make_directory ${CPP_COPY_DEST}
+		COMMAND ${CMAKE_COMMAND} -E copy $<TARGET_FILE:${TARGET_NAME}> ${CPP_COPY_DEST}
+		COMMAND ${CMAKE_COMMAND} -E echo "Copied $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
 		COMMAND_EXPAND_LISTS
 	)
 
@@ -165,8 +187,8 @@ macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 		get_target_property(RUNTIME_DLLS ${TARGET_NAME} INTERFACE_RUNTIME_DLLS)
 			if(RUNTIME_DLLS)
 				add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-						COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${TARGET_NAME}> $ENV{METAFFI_HOME}/${COPYPATH}
-						COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}"
+						COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${TARGET_NAME}> ${CPP_COPY_DEST}
+						COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
 						COMMAND_EXPAND_LISTS
 				)
 			endif()
@@ -180,8 +202,8 @@ macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 					COMMAND ${CMAKE_COMMAND} -E echo "Detected dependencies:"
 					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} echo {}
 					COMMAND ${CMAKE_COMMAND} -E echo "Copying dependencies:"
-					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} ${CMAKE_COMMAND} -E copy_if_different {} $ENV{METAFFI_HOME}/${COPYPATH}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to $ENV{METAFFI_HOME}/${COPYPATH}"
+					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} ${CMAKE_COMMAND} -E copy_if_different {} ${CPP_COPY_DEST}
+					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
 			)
 		else()
 			# Unsupported OS: Fail the configuration

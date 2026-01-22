@@ -3,17 +3,8 @@
 
 .vscode/
 
-dev-container/
-
-lang-plugin-go/
-
-lang-plugin-openjdk/
-
-lang-plugin-python311/
-lang-plugin-python312/
-lang-plugin-*
-
-metaffi-core/
+.claude/*
+.cursor/*
 
 output/
 
@@ -29,9 +20,6 @@ metaffi_installer.py
 metaffi_plugin_go_installer.py
 metaffi_plugin_openjdk_installer.py
 metaffi_plugin_python311_installer.py
-containers/
-
-metaffi-installer/
 
 metaffi.github.io
 
@@ -43,3 +31,9 @@ cmake-build*
 build/*
 
 __pycache__/
+
+containers
+lang-plugin-*
+metaffi-core
+metaffi-installer
+sdk

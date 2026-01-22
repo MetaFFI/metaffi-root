@@ -30,6 +30,37 @@ function(split_by_newline_charwise_sentinel input_var output_var)
     set(${output_var} "${out}" PARENT_SCOPE)
 endfunction()
 
+macro(split_env_pairs IN_VAR OUT_VAR)
+  # 1) Read the input buffer
+  set(__buf "${${IN_VAR}}")
+
+  # 2) Normalize line endings defensively (harmless if already done)
+  string(REPLACE "\r\n" "\n" __buf "${__buf}")
+  string(REPLACE "\r"    "\n" __buf "${__buf}")
+
+  # 3) Turn into a list of lines
+  # NOTE: This is safe because ';' should already be protected by your sentinel.
+  string(REPLACE "\n" ";" __lines "${__buf}")
+
+  # 4) Filter: keep only KEY=VALUE; skip banners and CMD pseudo-vars (=C:=...)
+  set(__out "")
+  foreach(__ln IN LISTS __lines)
+    # trim whitespace
+    string(STRIP "${__ln}" __ln)
+    if(__ln STREQUAL "")
+      continue()
+    endif()
+
+    # Only accept lines that look like real env assignments:
+    # KEY may contain letters, digits, underscore, and parentheses (matches your original)
+    if(__ln MATCHES "^[A-Za-z0-9_()]+=")
+      list(APPEND __out "${__ln}")
+    endif()
+  endforeach()
+
+  # 5) Return result to caller
+  set(${OUT_VAR} "${__out}")
+endmacro()
 
 
 
@@ -78,6 +109,7 @@ macro(load_msvc_env ARCH)
 		endif()
 
 		# Import each VAR=VALUE line into CMake process env
+		#message(STATUS "raw env:\n${_env_raw}\n\n")
 
 		# Normalize newlines
 		string(REPLACE "\r\n" "\n" _env_raw "${_env_raw}")
@@ -88,8 +120,13 @@ macro(load_msvc_env ARCH)
 		# replace \ with <:BACKSLASH:>
 		string(REPLACE "\\" "<:BACKSLASH:>" _env_raw "${_env_raw}")
 
-		# Find all lines of the form KEY=VALUE (excluding banner)
-		string(REGEX MATCHALL "\n([A-Za-z_0-9\\(\\)]+)=([^\n]+)" _env_pairs "${_env_raw}")
+		# Find all lines of the form KEY=VALUE
+		split_env_pairs(_env_raw _env_pairs)
+
+#		foreach(_pair IN LISTS _env_pairs)
+#			string(STRIP "${_pair}" _pair)
+#			message(STATUS "raw PAIR: '${_pair}'")
+#		endforeach()
 
 		foreach(_pair IN LISTS _env_pairs)
 			# remove the leading and trailing newlines

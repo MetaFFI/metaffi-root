@@ -1,4 +1,0 @@
----
-alwaysApply: true
----
-When running a terminal tool you get stuck because don't see the tool finish running, TO FIX THIS ALWAYS use CTRL+C at the end of the terminal tool.

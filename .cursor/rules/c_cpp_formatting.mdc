@@ -1,4 +1,0 @@
----
-alwaysApply: true
----
-C/C++ code should be formatted by the .clang-format file.

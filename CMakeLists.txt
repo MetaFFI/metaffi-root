@@ -1,7 +1,21 @@
 # This is the root of the MetaFFI project
 cmake_minimum_required(VERSION 3.10)
 
-cmake_policy(SET CMP0167 NEW) 
+cmake_policy(SET CMP0167 NEW)
+
+# Make sure METAFFI_HOME and METAFFI_SOURCE_ROOT environment variables are set
+if(NOT DEFINED ENV{METAFFI_HOME} OR "$ENV{METAFFI_HOME}" STREQUAL "")
+  message(FATAL_ERROR
+    "METAFFI_HOME environment variable is not set. It should store the directory of MetaFFI Installation directory (or output)."
+  )
+endif()
+
+if(NOT DEFINED ENV{METAFFI_SOURCE_ROOT} OR "$ENV{METAFFI_SOURCE_ROOT}" STREQUAL "")
+  message(FATAL_ERROR
+    "METAFFI_SOURCE_ROOT environment variable is not set. It should store the directory of MetaFFI source root directory"
+  )
+endif()
+
 
 # set the ./cmake path (as absolute path) to a variable
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -52,13 +66,15 @@ set(ENV{METAFFI_HOME} "${CMAKE_CURRENT_SOURCE_DIR}/output/${OS_NAME}/x64/${CMAKE
 
 # verify the projects exists 
 verify_project_exists("${METAFFI_ROOT_DIR}/metaffi-core" "https://github.com/MetaFFI/metaffi-core.git")
+verify_project_exists("${METAFFI_ROOT_DIR}/sdk" "https://github.com/MetaFFI/plugin-sdk.git")
 
 # add projects
+add_subdirectory(sdk)
 add_subdirectory(metaffi-core)
-add_subdirectory(lang-plugin-python311)
-add_subdirectory(lang-plugin-openjdk)
-add_subdirectory(lang-plugin-go)
+#add_subdirectory(lang-plugin-python3)
+#add_subdirectory(lang-plugin-jvm)
+#add_subdirectory(lang-plugin-go)
 #add_subdirectory(lang-plugin-c)
 #add_subdirectory(metaffi-installer)
 
-add_custom_target(MetaFFI DEPENDS metaffi-core python311 openjdk go)
+add_custom_target(MetaFFI DEPENDS metaffi-core python3 jvm go)
