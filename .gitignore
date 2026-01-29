@@ -31,9 +31,14 @@ cmake-build*
 build/*
 
 __pycache__/
-
+*.pyc
 containers
 lang-plugin-*
 metaffi-core
 metaffi-installer
 sdk
+go.work
+go.work.sum
+go.work
+go.work.sum
+.cache

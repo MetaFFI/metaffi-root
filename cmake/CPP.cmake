@@ -7,12 +7,12 @@ macro(collect_c_cpp_files_recursively paths prefix)
 
 	set(${prefix}_include_dir ${CMAKE_CURRENT_LIST_DIR})
 
-	file(GLOB_RECURSE ${prefix}_include
+	file(GLOB_RECURSE ${prefix}_include CONFIGURE_DEPENDS
 			"${path}/*.h"
 			"${path}/*.hpp"
 	)
 
-	file(GLOB_RECURSE all_src
+	file(GLOB_RECURSE all_src CONFIGURE_DEPENDS
 			"${path}/*.c"
 			"${path}/*.cpp"
 	)
@@ -35,13 +35,13 @@ macro(collect_c_cpp_files paths prefix)
 	set(all_src "")
 
 	foreach(path ${paths})
-		file(GLOB ${prefix}_include_tmp
+		file(GLOB ${prefix}_include_tmp CONFIGURE_DEPENDS
 				"${path}/*.h"
 				"${path}/*.hpp"
 		)
 		list(APPEND ${prefix}_include ${${prefix}_include_tmp})
 
-		file(GLOB all_src_tmp
+		file(GLOB all_src_tmp CONFIGURE_DEPENDS
 				"${path}/*.c"
 				"${path}/*.cpp"
 		)
