@@ -2,9 +2,9 @@
 
 ## High-level Components
 
-The following does **not** have to be implemented in C/C++, but the interfaces should be exported and accessible as C-compliant entrypoint.
+The following does **not** have to be implemented in C/C++, but the interfaces should be exported and accessible as C-compliant entrypoints.
 
-(Future plans: interface will be access via MetaFFI, removing the requirement of C-compliant entrypoint)
+(Future plans: interface will be accessed via MetaFFI, removing the requirement of C-compliant entrypoints)
 
 [ ] Implement runtime plugin [sdk/runtime/runtime_plugin_interface.h](sdk\runtime\runtime_plugin_interface.h)
 [ ] Implement IDL compiler plugin [sdk/idl_compiler/idl_plugin_interface.h](sdk/idl_compiler/idl_plugin_interface.h)
@@ -17,17 +17,25 @@ The following does **not** have to be implemented in C/C++, but the interfaces s
 
 ## SDK
 
-The SDK contains multiple core implementation that can be reused by plugins.
+The SDK contains multiple core implementations that can be reused by plugins.
 
-Some libraries can be shared across PLs (programming languages) that share runtime (e.g. Java, Scala), some libraries can be shared across PLs that shared syntax (e.g. Python3, Jython).
+Some libraries can be shared across PLs (programming languages) that share runtime (e.g. Java, Scala), some libraries can be shared across PLs that share syntax (e.g. Python3, Jython).
 
 You can use directly core libraries from the SDK, expand the SDK (PR the project) with new runtimes/syntax, or implement everything within your plugin.
+
+## Naming conventions used in this document
+
+- **runtime-name**: The underlying runtime/VM (e.g., `cpython3`, `jvm`).
+- **programming-language**: The surface language (e.g., `python3`, `java`, `scala`).
+- **plugin-name**: The MetaFFI plugin identifier (often the programming language, e.g., `python3`, `go`).
+
+These affect directory layout and CMake targets. When in doubt, follow existing plugins.
 
 ## Note about the rest of the document
 
 The document will refer to using or expanding the SDK, but may implement everything within your plugin.
 
-By expanding the SDK, you will help future implementations and can improve future intergrations, therefore, expanding the SDK is **highly recommended**.
+By expanding the SDK, you will help future implementations and can improve future integrations, therefore, expanding the SDK is **highly recommended**.
 
 Large SDK means the plugins can simply "assemble" different core libraries together to support new PL.
 
@@ -35,7 +43,15 @@ Large SDK means the plugins can simply "assemble" different core libraries toget
 
 - Plugins should enforce fast-fail policy.
 - If implementing into SDK, you must link the libraries/components into the CMake build system.
-- Plugins generally suppose to be cross-platform (e.g. Window, Linux, MacOS)
+- Plugins are generally supposed to be cross-platform (e.g. Windows, Linux, macOS)
+
+## Paths & environment variables (tests and runtime loading)
+
+- `METAFFI_HOME`: installation/output directory used for loading `xllr` and plugins.
+- `METAFFI_SOURCE_ROOT`: MetaFFI source root on dev machines (if set).
+- `sdk_include_dir`: CMake variable pointing to the SDK root.
+
+Prefer these instead of `..` in test paths and module loading.
 
 ## The Test plugin (xllr.test)
 
@@ -57,6 +73,7 @@ CMake scripts, in `cmake/` are available to use. They are loaded into the CMake 
     - Unit-test information in `sdk/cdts_serializer/serializer_tests_doc.md`
     - Will be used by `runtime_manager`, so when picking a programming language, this should be taken into account
     - CDT code, MetaFFI primitives and additional helper functions are available at `sdk/runtime/`.
+    - Handle rule: when serializing a handle, set the runtime ID of the serializer; when deserializing, if the handle runtime ID matches this runtime, return the native object instead of a handle.
 
 [ ] Implement or use `runtime_manager` in `sdk/runtime_manager/[runtime-name]/`.
     - Load/unload the target runtime
@@ -65,7 +82,7 @@ CMake scripts, in `cmake/` are available to use. They are loaded into the CMake 
     - Provides functionality to use the entities (e.g. read a field, call a method)
     - Uses native runtime data types
     - As part of this implementation of loading entities, you need to decide what is the required `entity_path`.
-      - `entity_path` is a CSV-based string, where key and value are seperated by '='
+    - `entity_path` is a CSV-based string, where key and value are separated by '='
       - It may contain any information that is required in runtime, to load an entity
       - add to `sdk/idl_entities/entity_path_specs.json` the new runtime's `entity_path`
     - HIGHLY RECOMMENDED: Load runtime completely dynamically, without any build-time linking. This will provide a single plugin that supports multiple runtime versions.
@@ -79,16 +96,17 @@ CMake scripts, in `cmake/` are available to use. They are loaded into the CMake 
 [ ] Make sure all unit-tests pass successfully. If in SDK, make sure all tests are executed by CMake.
 
 ## Important Note
-- All heap-managenemt (allocation and free) **must** be done via `xllr` using `xllr_alloc_*` and `xllr_free_*` functions to avoid using non-compitable allocators which leads to undefined behavior.
+- All heap management (allocation and free) **must** be done via `xllr` using `xllr_alloc_*` and `xllr_free_*` functions to avoid using non-compatible allocators which leads to undefined behavior.
 
-- **For some runtime**, you won't be able to load entities from the target module without adding *ad-hoc* code to allow the entities to be exported to C (e.g., Go, C, C++, Rust). In this case, **start with `idl_compiler` and `guest compiler` plugin(!)** and then get back to this phase.
+- **For some runtimes**, you won't be able to load entities from the target module without adding *ad-hoc* code to allow the entities to be exported to C (e.g., Go, C, C++, Rust). In this case, **start with `idl_compiler` and `guest compiler` plugin(!)** and then get back to this phase.
 
 # API
 
 ## Steps
 [ ] Implement or use `api` in `sdk/api/[runtime-name]/`.
-    - The loads and uses XLLR and, if required, your new plugin, to load/unload the runtime, load/unload entities and call them.
+    - The API loads and uses XLLR and, if required, your new plugin, to load/unload the runtime, load/unload entities and call them.
     - The API loads the dynamic library `xllr` resides in $METAFFI_HOME and uses the XLLR-API (`sdk\runtime\xllr_api.h`) to load the plugin's runtime interface `sdk\runtime\runtime_plugin_interface.h`.
+    - Dev convenience: if `$METAFFI_SOURCE_ROOT` is set, allow importing the MetaFFI API package from the repo (e.g., `sdk/api/python3`) before falling back to the package manager.
     - More information in [sdk/api/api_doc.md](sdk\api\api_doc.md)
     - Unit-test information in [sdk\api\api_tests_doc.md](sdk\api\api_tests_doc.md)
 
@@ -103,9 +121,12 @@ At this point, you implemented enough code to call **from** the supported langua
 You can test your code by calling `xllr.test`.
 
 [ ] Write a unit-test for your `api` module, that loads the target runtime `test`.
+
 [ ] To check which tests you need to perform against `xllr.test`, read [sdk/test_modules/guest_modules/test/test_entities.md](sdk\test_modules\guest_modules\test\test_entities.md).
+
 [ ] Implement tests for all the entities `xllr.test` provides.
-[ ] Do not forget to add this as a target to CMake
+
+[ ] Do not forget to add this as a target to CMake (use `find_or_install_package(doctest)`, `c_cpp_exe`, `add_test`, and bubble targets to the plugin aggregator target).
 
 `xllr.test`, in `sdk/test_modules/guest_modules/test/` contains the C++ code being called. It checks directly the CDTS your API + runtime_manager + cdts serializer is sending it, and returns an expected result back, which your unit-test can verify.
 
@@ -115,18 +136,22 @@ Use C/C++ code available at `sdk/runtime/` to load `xllr` and use the new plugin
 
 ### Test Guest
 
-Implement a guest module in your a programming language that uses the target runtime (or implement in more PLs, as long as they all use the same runtime). The compiled/built test module should be placed in `sdk/test_modules/guest_modules/[programming-language]/test_bin/`.
+Implement a guest module in your programming language that uses the target runtime (or implement in more PLs, as long as they all use the same runtime). The compiled/built test module should be placed in `sdk/test_modules/guest_modules/[programming-language]/test_bin/` when applicable (some runtimes should use source or a module directory instead of version-specific bytecode).
 
 [ ] Implement or use test module for your runtime in `sdk/test_modules/guest_modules/[programming-language]`.
     - More information about guest module in [sdk/test_modules/guest_modules/guest_modules_doc.md](sdk/test_modules/guest_modules/guest_modules_doc.md).
-    - Make sure the test module is built to `sdk/test_modules/guest_modules/[programming-language]/test_bin/`
-[ ] Do not forget to add this as a target to CMake
+    - Make sure the test module is built to `sdk/test_modules/guest_modules/[programming-language]/test_bin/` when applicable
+  
+[ ] Do not forget to add this as a target to CMake (use `find_or_install_package(doctest)`, `c_cpp_exe`, `add_test`, and bubble targets to the plugin aggregator target).
 
-### Host C/C++ module test
+### Host C/C++ module test (plugin-local)
 
-[ ] Implement or use `sdk/test_modules/host_modules/[programming-language]/` using C++ and available code in `sdk/runtime/` to load the target runtime using the new plugins
+[ ] Implement host module tests under `[plugin-directory]/test` using C++ and available code in `sdk/runtime/` to load the target runtime using the new plugins
+
 [ ] Implement tests for all the entities you exposed in `sdk/test_modules/guest_modules/[programming-language]/`. Preferably, use `doctest`.
+
 [ ] More information about host module in [sdk/test_modules/host_modules/host_modules_doc.md](sdk\test_modules/host_modules/host_modules_doc.md)
+
 [ ] Do not forget to add this as a target to CMake
 
 
@@ -134,7 +159,7 @@ Implement a guest module in your a programming language that uses the target run
 This concludes the runtime integration between MetaFFI and the new runtime.
 The next sections are for:
 - IDL Compiler (**mandatory**)
-- In cases guest compiler is **Mandatory** (you should start here before )
+- In cases guest compiler is **Mandatory** (you should start here before returning to runtime integration)
 - *Optional* host compiler
 
 ---
@@ -172,13 +197,15 @@ Both host and guest compiler plugin receive as input the MetaFFI IDL and generat
 The runtime plugin (via runtime manager) needs to load the entities from the target runtime executable. In some cases, unless the runtime executable is not explicitly exposes the entities, the runtime manager cannot load the entities.
 In this case, the guest compiler, needs to generate code for the target runtime or language to expose the entities to MetaFFI (i.e. C entrypoints).
 
-The goal of the guest compiler is to use the MetaFFI IDL and generate generate entrypoint to required entities. There can be two cases:
+The goal of the guest compiler is to use the MetaFFI IDL and generate entrypoints to required entities. There can be two cases:
 1. In cases the runtime executable does not contain any entrypoints (i.e. non-MetaFFI compliant entrypoint), the compiler plugin would need to generate code that uses the **entities source code** in order to build new runtime executable with MetaFFI compliant entrypoints.
-2. In case the runtime executable does contain entrypoints (i.e. even if non-MetaFFI compilant), the compiler plugin can generate code that wraps the existing non-MetaFFI compliant entrypoint, meaning, the source code is not required.
+2. In case the runtime executable does contain entrypoints (i.e. even if non-MetaFFI compliant), the compiler plugin can generate code that wraps the existing non-MetaFFI compliant entrypoint, meaning, the source code is not required.
 
 ### Steps
 [ ] Implement or use guest compiler **library** in `sdk/compiler/[runtime-name]/guest/` to generate MetaFFI IDL. Use the IDL Entities in `sdk/idl_entities/[runtime-name]/` to construct the IDL.
+
 [ ] More information in [sdk/compiler/compiler_doc.md](sdk/compiler/compiler_doc.md)
+
 [ ] Unit-test information in [sdk/compiler/compiler_tests_doc.md](sdk/compiler/compiler_tests_doc.md)
 
 [ ] In the plugin directory/repository, implement [sdk/compiler/compiler_plugin_interface.h](sdk/compiler/compiler_plugin_interface.h) using `idl_entities` and `compiler` in `[plugin-directory]/compiler/`.
@@ -188,13 +215,15 @@ The goal of the guest compiler is to use the MetaFFI IDL and generate generate e
 
 ## Host compiler (optional)
 
-To load entities in other languages, the user can use the MetaFFI API for its language/runtime. But in cases of large libraries, this would be a daugnting task. Therefore, the host compiler receives a MetaFFI IDL and generates the entities in that languages, where the implementations are stubs that use MetaFFI API to make the cross-call.
+To load entities in other languages, the user can use the MetaFFI API for its language/runtime. But in cases of large libraries, this would be a daunting task. Therefore, the host compiler receives a MetaFFI IDL and generates the entities in that language, where the implementations are stubs that use MetaFFI API to make the cross-call.
 
 This keeps the cross-call completely transparent and leaves it "behind the scenes".
 
 ### Steps
-[ ] Implement or use guest compiler **library** in `sdk/compiler/[runtime-name]/host/` to generate MetaFFI IDL. Use the IDL Entities in `sdk/idl_entities/[runtime-name]/` to construct the IDL.
+[ ] Implement or use host compiler **library** in `sdk/compiler/[runtime-name]/host/` to generate MetaFFI IDL. Use the IDL Entities in `sdk/idl_entities/[runtime-name]/` to construct the IDL.
+
 [ ] More information in [sdk/compiler/compiler_doc.md](sdk/compiler/compiler_doc.md)
+
 [ ] Unit-test information in [sdk/compiler/compiler_tests_doc.md](sdk/compiler/compiler_tests_doc.md)
 
 [ ] In the plugin directory/repository, implement [sdk/compiler/compiler_plugin_interface.h](sdk/compiler/compiler_plugin_interface.h) using `idl_entities` and `compiler` in `[plugin-directory]/compiler/`.
@@ -205,7 +234,9 @@ This keeps the cross-call completely transparent and leaves it "behind the scene
 ### End-to-end tests via Host compiler
 
 [ ] Write a unit-test for your `host compiler` module, that generates host code to target runtime `test`. `xllr.test` entities are IDL is available at `sdk/test_modules/guest_modules/test/test_entities.idl.json`.
+
 [ ] Implement tests for all the entities `xllr.test` provides by using the generated code from the host IDL.
+
 [ ] Do not forget to add this as a target to CMake
 
 `xllr.test`, in `sdk/test_modules/guest_modules/test/` contains the C++ code being called. It checks directly the CDTS your API + runtime_manager + cdts serializer is sending it, and returns an expected result back, which your unit-test can verify.
@@ -217,4 +248,5 @@ In the plugin directory:
 [ ] Under `[plugin-directory]/tests/host/` implement a unit-test to call all other guest modules available at `sdk/test_modules/guest_modules/` using their corresponding plugins.
     - If you have implemented host compiler, use it.
     - Otherwise, use the API.
+
 [ ] Under `[plugin-directory]/tests/guest/` implement unit-tests from all other languages, using their API at `sdk/api/` or host plugin (if available) to call your test module at `sdk/test_modules/guest_modules/[programming-language]`.
