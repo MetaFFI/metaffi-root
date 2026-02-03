@@ -45,6 +45,20 @@ Large SDK means the plugins can simply "assemble" different core libraries toget
 - If implementing into SDK, you must link the libraries/components into the CMake build system.
 - Plugins are generally supposed to be cross-platform (e.g. Windows, Linux, macOS)
 
+## XCall CDTS Convention
+
+When calling xcall, the `cdts*` parameter is **always** a 2-element array:
+- `cdts[0]` = parameters (populated by caller for functions with params)
+- `cdts[1]` = return values (populated by callee for functions with returns)
+
+This convention applies to ALL xcall variants:
+- `PARAMS_RET`: Use both `data[0]` (params) and `data[1]` (returns)
+- `PARAMS_NO_RET`: Use `data[0]` (params), `data[1]` is unused
+- `NO_PARAMS_RET`: `data[0]` is unused, use `data[1]` (returns)
+- `NO_PARAMS_NO_RET`: Neither element is used (data may be nullptr)
+
+Host runtimes must always allocate and pass a 2-element cdts array when `params_count > 0 || retval_count > 0`.
+
 ## Paths & environment variables (tests and runtime loading)
 
 - `METAFFI_HOME`: installation/output directory used for loading `xllr` and plugins.

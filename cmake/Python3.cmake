@@ -12,7 +12,7 @@ endif()
 macro(add_py_test NAME)
 	cmake_parse_arguments("add_py_test"
 			"" # bool vals
-			"WORKING_DIRECTORY" # single val
+			"WORKING_DIRECTORY;MODULE" # single val
 			"" # multi-vals
 			${ARGN})
 
@@ -32,7 +32,13 @@ macro(add_py_test NAME)
 
 
 	if("${add_py_test_WORKING_DIRECTORY}" STREQUAL "")
-		set(add_go_test_WORKING_DIRECTORY .)
+		set(add_py_test_WORKING_DIRECTORY .)
+	endif()
+
+	if(add_py_test_MODULE)
+		set(_py_test_module ${add_py_test_MODULE})
+	else()
+		set(_py_test_module ${NAME})
 	endif()
 
 	if(NOT "${add_py_test_DEPENDENCIES}" STREQUAL "")
@@ -45,7 +51,7 @@ macro(add_py_test NAME)
 
 	if(EXISTS ${PYEXECFULLPATH})
 		add_test(NAME "(python3 test) ${NAME}"
-				COMMAND ${PYEXECFULLPATH} -m unittest ${NAME}
+				COMMAND ${PYEXECFULLPATH} -m unittest ${_py_test_module}
 				WORKING_DIRECTORY ${add_py_test_WORKING_DIRECTORY})
 	else()
 		message(WARNING "Python executable not found at ${PYEXECFULLPATH}. Test ${NAME} not added.")

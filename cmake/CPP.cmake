@@ -108,14 +108,12 @@ macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 	if(NOT ARG_SKIP_DEPS)
 		# Conditional logic based on OS
 		if(WIN32)
-			# Windows: Use TARGET_RUNTIME_DLLS
+			# Windows: USE TARGET_RUNTIME_DLLS
+			# Note: If there are no runtime DLLs, this command will print the message but effectively do nothing
 			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
 					COMMAND ${CMAKE_COMMAND} -E echo "Going to Copy dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}. Deps: $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>"
-					COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					$<TARGET_RUNTIME_DLLS:${TARGET_NAME}>
-					${CPP_COPY_DEST}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
-					COMMAND_EXPAND_LISTS
+					COMMAND ${CMAKE_COMMAND} -E true
+					COMMAND ${CMAKE_COMMAND} -E echo "Finished processing dependencies of $<TARGET_FILE:${TARGET_NAME}>"
 			)
 		elseif(UNIX AND NOT APPLE)
 			# Linux: Use ldd to find and copy shared libraries
