@@ -97,6 +97,9 @@ macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 		target_link_libraries(${TARGET_NAME} PRIVATE ${LIB})
 	endforeach()
 
+	# C logging shim (C-only call sites, spdlog backend)
+	target_sources(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/sdk/utils/logger_c.cpp)
+
         # Copy the executable to the target directory
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
                         COMMAND ${CMAKE_COMMAND} -E echo "Going to copy $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}:"
@@ -112,8 +115,9 @@ macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 			# Note: If there are no runtime DLLs, this command will print the message but effectively do nothing
 			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
 					COMMAND ${CMAKE_COMMAND} -E echo "Going to Copy dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}. Deps: $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>"
-					COMMAND ${CMAKE_COMMAND} -E true
+					COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${TARGET_NAME}> ${CPP_COPY_DEST}
 					COMMAND ${CMAKE_COMMAND} -E echo "Finished processing dependencies of $<TARGET_FILE:${TARGET_NAME}>"
+					COMMAND_EXPAND_LISTS
 			)
 		elseif(UNIX AND NOT APPLE)
 			# Linux: Use ldd to find and copy shared libraries
@@ -132,6 +136,12 @@ macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 			# Unsupported OS: Fail the configuration
 			message(FATAL_ERROR "Unsupported OS: This macro only supports Windows and Linux.")
 		endif()
+	endif()
+
+	# Auto-link spdlog for centralized logging
+	if(spdlog_FOUND)
+		target_link_libraries(${TARGET_NAME} PRIVATE spdlog::spdlog)
+		target_compile_definitions(${TARGET_NAME} PRIVATE SPDLOG_ACTIVE_LEVEL=${METAFFI_SPDLOG_LEVEL})
 	endif()
 endmacro()
 
@@ -168,6 +178,9 @@ macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 		target_link_libraries(${TARGET_NAME} PRIVATE ${LIB})
 	endforeach()
 
+	# C logging shim (C-only call sites, spdlog backend)
+	target_sources(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/sdk/utils/logger_c.cpp)
+
 	# copy using POST-BUILD the target to METAFFI_HOME/PATH
 	# and print a message of the copy
 	add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
@@ -182,14 +195,11 @@ macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 		# Check if there are any runtime DLLs to copy
 		# copy its dependencies to the same directory. Use TARGET_RUNTIME_DLLS expression to get the list of dependencies
 		if(WIN32)
-		get_target_property(RUNTIME_DLLS ${TARGET_NAME} INTERFACE_RUNTIME_DLLS)
-			if(RUNTIME_DLLS)
-				add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-						COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${TARGET_NAME}> ${CPP_COPY_DEST}
-						COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
-						COMMAND_EXPAND_LISTS
-				)
-			endif()
+			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+					COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${TARGET_NAME}> ${CPP_COPY_DEST}
+					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
+					COMMAND_EXPAND_LISTS
+			)
 		elseif(UNIX AND NOT APPLE)
 			# Linux: Use ldd to find and copy shared libraries
 			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
@@ -208,5 +218,10 @@ macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 			message(FATAL_ERROR "Unsupported OS: This macro only supports Windows and Linux.")
 		endif()
 	endif()
-endmacro()
 
+	# Auto-link spdlog for centralized logging
+	if(spdlog_FOUND)
+		target_link_libraries(${TARGET_NAME} PRIVATE spdlog::spdlog)
+		target_compile_definitions(${TARGET_NAME} PRIVATE SPDLOG_ACTIVE_LEVEL=${METAFFI_SPDLOG_LEVEL})
+	endif()
+endmacro()
