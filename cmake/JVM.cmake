@@ -283,3 +283,80 @@ macro(add_junit_test TARGET_NAME)
 
 endmacro()
 #-----------------------------------------------------------------------------------------------
+#
+# Runs a Java main-class test and adds to CTest
+# Usage: add_java_main_test(TARGET_NAME TEST_CLASS CLASSPATH OUTPUT_DIR [WORKING_DIRECTORY dir] [DEPENDS ...] [COMMENT "message"])
+macro(add_java_main_test TARGET_NAME)
+	# Parse arguments
+	set(options)
+	set(one_value_args TEST_CLASS OUTPUT_DIR COMMENT WORKING_DIRECTORY)
+	set(multi_value_args CLASSPATH DEPENDS)
+	cmake_parse_arguments(ADD_JAVA_MAIN "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+
+	# Ensure required parameters are set
+	if(NOT ADD_JAVA_MAIN_TEST_CLASS)
+		message(FATAL_ERROR "add_java_main_test: TEST_CLASS parameter is required")
+	endif()
+	if(NOT ADD_JAVA_MAIN_CLASSPATH)
+		message(FATAL_ERROR "add_java_main_test: CLASSPATH parameter is required")
+	endif()
+	if(NOT ADD_JAVA_MAIN_OUTPUT_DIR)
+		message(FATAL_ERROR "add_java_main_test: OUTPUT_DIR parameter is required")
+	endif()
+
+	# Set default comment if not provided
+	if(NOT ADD_JAVA_MAIN_COMMENT)
+		set(ADD_JAVA_MAIN_COMMENT "Running Java main-class tests")
+	endif()
+
+	# Join classpath list into a single string with platform-appropriate separator
+	if(WIN32)
+		string(JOIN ";" CLASSPATH_STR ${ADD_JAVA_MAIN_CLASSPATH})
+	else()
+		string(JOIN ":" CLASSPATH_STR ${ADD_JAVA_MAIN_CLASSPATH})
+	endif()
+
+	# Create output directory if needed
+	file(MAKE_DIRECTORY ${ADD_JAVA_MAIN_OUTPUT_DIR})
+
+	# Set working directory if provided
+	if(ADD_JAVA_MAIN_WORKING_DIRECTORY)
+		set(JAVA_MAIN_WORKDIR ${ADD_JAVA_MAIN_WORKING_DIRECTORY})
+	else()
+		set(JAVA_MAIN_WORKDIR ${CMAKE_CURRENT_SOURCE_DIR})
+	endif()
+
+	# Add test to CTest
+	add_test(
+		NAME "(java main test) ${TARGET_NAME}"
+		COMMAND ${Java_JAVA_EXECUTABLE} -cp "${CLASSPATH_STR}" ${ADD_JAVA_MAIN_TEST_CLASS}
+		WORKING_DIRECTORY ${JAVA_MAIN_WORKDIR}
+	)
+
+	set_tests_properties("(java main test) ${TARGET_NAME}" PROPERTIES
+		LABELS "java"
+	)
+
+	# Set test dependencies if provided
+	if(ADD_JAVA_MAIN_DEPENDS)
+		set_tests_properties("(java main test) ${TARGET_NAME}" PROPERTIES
+			DEPENDS "${ADD_JAVA_MAIN_DEPENDS}"
+		)
+	endif()
+
+	# Create custom command to run tests (for build-time execution)
+	add_custom_command(
+		OUTPUT ${ADD_JAVA_MAIN_OUTPUT_DIR}/.tests_run
+		COMMAND ${Java_JAVA_EXECUTABLE} -cp "${CLASSPATH_STR}" ${ADD_JAVA_MAIN_TEST_CLASS}
+		DEPENDS ${ADD_JAVA_MAIN_DEPENDS}
+		WORKING_DIRECTORY ${JAVA_MAIN_WORKDIR}
+		COMMENT ${ADD_JAVA_MAIN_COMMENT}
+	)
+
+	# Create target that depends on the test run marker (for build-time execution)
+	add_custom_target(${TARGET_NAME}_build
+		DEPENDS ${ADD_JAVA_MAIN_OUTPUT_DIR}/.tests_run
+	)
+
+endmacro()
+#-----------------------------------------------------------------------------------------------
