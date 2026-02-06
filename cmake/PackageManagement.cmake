@@ -58,6 +58,123 @@ macro(find_or_install_package package)
     endif()
 endmacro()
 
+# find_or_install_maven_package macro
+# Downloads a Maven artifact to a destination directory if missing.
+# Usage: find_or_install_maven_package(OUT_VAR GROUP_ID ARTIFACT_ID VERSION DEST_DIR)
+function(find_or_install_maven_package OUT_VAR GROUP_ID ARTIFACT_ID VERSION DEST_DIR)
+	if("${OUT_VAR}" STREQUAL "" OR "${GROUP_ID}" STREQUAL "" OR "${ARTIFACT_ID}" STREQUAL "" OR "${VERSION}" STREQUAL "" OR "${DEST_DIR}" STREQUAL "")
+		message(FATAL_ERROR "find_or_install_maven_package requires OUT_VAR, GROUP_ID, ARTIFACT_ID, VERSION, DEST_DIR")
+	endif()
+
+	string(TOUPPER "${VERSION}" _version_upper)
+	set(_is_floating FALSE)
+	if(_version_upper STREQUAL "LATEST" OR _version_upper STREQUAL "RELEASE")
+		set(_is_floating TRUE)
+	endif()
+
+	if(_is_floating)
+		set(_jar_name "${ARTIFACT_ID}.jar")
+	else()
+		set(_jar_name "${ARTIFACT_ID}-${VERSION}.jar")
+	endif()
+	set(_jar_path "${DEST_DIR}/${_jar_name}")
+	set(${OUT_VAR} "${_jar_path}" PARENT_SCOPE)
+
+	if(EXISTS "${_jar_path}")
+		return()
+	endif()
+
+	if(DEFINED MAVEN_EXECUTABLE)
+		unset(MAVEN_EXECUTABLE CACHE)
+	endif()
+	if(WIN32)
+		find_program(MAVEN_EXECUTABLE NAMES mvn.cmd mvn.bat mvn)
+	else()
+		find_program(MAVEN_EXECUTABLE mvn)
+	endif()
+	if(NOT MAVEN_EXECUTABLE)
+		message(FATAL_ERROR "Maven (mvn) not found. Please install Maven or add it to PATH.")
+	endif()
+
+	file(MAKE_DIRECTORY "${DEST_DIR}")
+
+	if(_is_floating)
+		file(GLOB _old_jars
+			"${DEST_DIR}/${ARTIFACT_ID}.jar"
+			"${DEST_DIR}/${ARTIFACT_ID}-*.jar"
+		)
+		foreach(_old_jar IN LISTS _old_jars)
+			file(REMOVE "${_old_jar}")
+		endforeach()
+	endif()
+
+	set(_strip_version_arg "")
+	if(_is_floating)
+		set(_strip_version_arg "-DstripVersion=true")
+	endif()
+
+	set(_maven_command ${MAVEN_EXECUTABLE})
+	if(WIN32 AND MAVEN_EXECUTABLE MATCHES "\\.(cmd|bat)$")
+		set(_maven_command cmd /c "${MAVEN_EXECUTABLE}")
+	endif()
+
+	execute_process(
+		COMMAND ${_maven_command}
+			-q
+			-Dartifact=${GROUP_ID}:${ARTIFACT_ID}:${VERSION}
+			-DoutputDirectory=${DEST_DIR}
+			-Dtransitive=false
+			${_strip_version_arg}
+			dependency:copy
+		RESULT_VARIABLE exit_code
+	)
+	if(exit_code)
+		message(FATAL_ERROR "Failed to download Maven artifact ${GROUP_ID}:${ARTIFACT_ID}:${VERSION}")
+	endif()
+
+	if(NOT EXISTS "${_jar_path}")
+		file(GLOB _matches "${DEST_DIR}/${ARTIFACT_ID}-*.jar")
+		list(LENGTH _matches _match_len)
+		if(_match_len EQUAL 1)
+			list(GET _matches 0 _match)
+			set(${OUT_VAR} "${_match}" PARENT_SCOPE)
+			return()
+		endif()
+		message(FATAL_ERROR "Maven artifact downloaded but jar not found: ${_jar_path}")
+	endif()
+endfunction()
+
+# find_or_install_pip_package macro
+# Ensures a Python package is installed via pip.
+# Usage: find_or_install_pip_package(PACKAGE_NAME)
+function(find_or_install_pip_package PACKAGE_NAME)
+	if("${PACKAGE_NAME}" STREQUAL "")
+		message(FATAL_ERROR "find_or_install_pip_package requires PACKAGE_NAME")
+	endif()
+
+	find_program(PYTHON_EXECUTABLE python3 python)
+	if(NOT PYTHON_EXECUTABLE)
+		message(FATAL_ERROR "Python executable not found for pip installation")
+	endif()
+
+	execute_process(
+		COMMAND ${PYTHON_EXECUTABLE} -m pip show ${PACKAGE_NAME}
+		RESULT_VARIABLE pip_show_exit
+		OUTPUT_QUIET
+		ERROR_QUIET
+	)
+
+	if(pip_show_exit)
+		execute_process(
+			COMMAND ${PYTHON_EXECUTABLE} -m pip install ${PACKAGE_NAME} --upgrade
+			RESULT_VARIABLE pip_install_exit
+		)
+		if(pip_install_exit)
+			message(FATAL_ERROR "Failed to install pip package: ${PACKAGE_NAME}")
+		endif()
+	endif()
+endfunction()
+
 # copy_vcpkg_runtime_dependencies macro
 # Copies vcpkg runtime dependencies to $METAFFI_HOME.
 # Handles platform-specific shared libraries:

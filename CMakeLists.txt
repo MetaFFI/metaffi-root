@@ -74,7 +74,7 @@ verify_project_exists("${METAFFI_ROOT_DIR}/sdk" "https://github.com/MetaFFI/plug
 add_subdirectory(sdk)
 add_subdirectory(metaffi-core)
 add_subdirectory(lang-plugin-python3)
-#add_subdirectory(lang-plugin-jvm)
+add_subdirectory(lang-plugin-jvm)
 #add_subdirectory(lang-plugin-go)
 #add_subdirectory(lang-plugin-c)
 #add_subdirectory(metaffi-installer)
