@@ -80,6 +80,7 @@ Prefer these instead of `..` in test paths and module loading.
 [ ] Define standard path precedence for all components that import SDK code dynamically (recommended: `METAFFI_SOURCE_ROOT` first, then `METAFFI_HOME`).
 [ ] If your plugins load language-specific SDK modules at runtime (IDL/compiler/runtime helpers), stage/copy those modules into a runtime-discoverable location under `$METAFFI_HOME` and add that path to the runtime's module search path.
 [ ] If your build process stages runtime dependencies or SDK modules into `$METAFFI_HOME`, ensure `METAFFI_HOME` is set at build time and fail fast if it is missing.
+[ ] If the runtime needs extra dependency search paths (e.g., classpath/module paths/extra DLL dirs), define a standard override (env var or host_options) and propagate it through `runtime_manager.load_module()` and tests.
 
 ## The Test plugin (xllr.test)
 
@@ -113,6 +114,7 @@ CMake scripts, in `cmake/` are available to use. They are loaded into the CMake 
     - `entity_path` is a CSV-based string, where key and value are separated by '='
       - It may contain any information that is required in runtime, to load an entity
       - add to `sdk/idl_entities/entity_path_specs.json` the new runtime's `entity_path`
+    - If your runtime needs dependency search paths (classpath/module paths/etc.), accept them in `load_module()` and thread them to class/module resolution.
     - HIGHLY RECOMMENDED: Load runtime completely dynamically, without any build-time linking. This will provide a single plugin that supports multiple runtime versions.
     - More information in [sdk/runtime_manager/runtime_manager_doc.md](sdk/runtime_manager/runtime_manager_doc.md)
     - Unit-test information in [sdk/runtime_manager/runtime_manager_tests_doc.md](sdk/runtime_manager/runtime_manager_tests_doc.md)
@@ -214,6 +216,7 @@ The plugin turns code or executable code into MetaFFI IDL
     - The output is MetaFFI IDL
     - More information in [sdk\idl_compiler\idl_compiler_doc.md]()
     - Unit-test information in [sdk\idl_compiler\idl_compiler_tests_doc.md]()
+    - If the compiler needs a runtime/toolchain (e.g., JVM/CLR), prefer dynamic discovery via `runtime_manager` at runtime and avoid build-time linking. Tests can still rely on dev toolchains, but production code should not.
 
 [ ] In the plugin directory/repository, implement [sdk/idl_compiler/idl_plugin_interface.h](sdk/idl_compiler/idl_plugin_interface.h) using `idl_entities` and `idl_compiler` in `[plugin-directory]/idl/`.
 
@@ -268,6 +271,7 @@ This keeps the cross-call completely transparent and leaves it "behind the scene
 [ ] If your compiler plugin loads SDK modules at runtime, ensure those modules are staged under `$METAFFI_HOME` (or an equivalent runtime path) and added to the runtime module search path.
 
 [ ] The dynamic library should be copied to $METAFFI_HOME/[plugin-name]/metaffi.compiler.[plugin-name].[dynamic-library-extension] including all dependencies.
+    - If the host compiler implementation is in the target runtime (e.g., Java), package it into the runtime’s native artifact (jar/wheel/etc.) and stage it under `$METAFFI_HOME/[plugin-name]/compiler/` so the plugin can locate it at runtime.
 
 ### End-to-end tests via Host compiler
 
