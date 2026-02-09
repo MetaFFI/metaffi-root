@@ -54,6 +54,7 @@ Large SDK means the plugins can simply "assemble" different core libraries toget
 - Plugins should enforce fast-fail policy.
 - If implementing into SDK, you must link the libraries/components into the CMake build system.
 - Plugins are generally supposed to be cross-platform (e.g. Windows, Linux, macOS)
+- Use the shared logger (`metaffi::get_logger(...)`) instead of creating direct spdlog instances. Prefer one logger per module and avoid logging during static initialization.
 
 ## XCall CDTS Convention
 
