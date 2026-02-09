@@ -22,50 +22,63 @@ function(go_get TARGET)
 			USES_TERMINAL )
 endfunction()
 
+# OUTPUT_TYPE: "shared" (default) or "executable". Optional PACKAGE (e.g. ./cmd/foo). Builds from SOURCE_DIR.
 macro(go_build TARGET)
-	set(options)
-	set(one_value_args OUTPUT_DIR OUTPUT_NAME)
+	set(one_value_args OUTPUT_DIR OUTPUT_NAME OUTPUT_TYPE PACKAGE)
 	set(multi_value_args SOURCE_DIR DEPENDENT)
-	cmake_parse_arguments(GO_BUILD "${options}" "${one_value_args}" "${multi_value_args}" ${ARGN})
+	cmake_parse_arguments(GO_BUILD "" "${one_value_args}" "SOURCE_DIR;DEPENDENT" ${ARGN})
 
-	if(NOT GO_BUILD_OUTPUT_DIR)
-		message(FATAL_ERROR "go_build: OUTPUT_DIR parameter is required")
+	if(NOT GO_BUILD_OUTPUT_DIR OR NOT GO_BUILD_OUTPUT_NAME OR NOT GO_BUILD_SOURCE_DIR)
+		message(FATAL_ERROR "go_build: OUTPUT_DIR, OUTPUT_NAME, SOURCE_DIR required")
 	endif()
-	if(NOT GO_BUILD_OUTPUT_NAME)
-		message(FATAL_ERROR "go_build: OUTPUT_NAME parameter is required")
-	endif()
-	if(NOT GO_BUILD_SOURCE_DIR)
-		message(FATAL_ERROR "go_build: SOURCE_DIR parameter is required")
+	if(NOT GO_BUILD_OUTPUT_TYPE)
+		set(GO_BUILD_OUTPUT_TYPE "shared")
 	endif()
 
-	# Gather all *.go files in the DEPENDENT directories
 	set(GO_DEPENDENT_FILES)
 	foreach(DEPENDENT_DIR ${GO_BUILD_DEPENDENT})
 		file(GLOB_RECURSE GO_FILES "${DEPENDENT_DIR}/*.go")
 		list(APPEND GO_DEPENDENT_FILES ${GO_FILES})
 	endforeach()
 
-	if(IS_ABSOLUTE "${GO_BUILD_OUTPUT_DIR}")
-		set(GO_BUILD_OUTPUT_PATH "${GO_BUILD_OUTPUT_DIR}/${GO_BUILD_OUTPUT_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+	if(GO_BUILD_OUTPUT_TYPE STREQUAL "executable")
+		if(IS_ABSOLUTE "${GO_BUILD_OUTPUT_DIR}")
+			set(GO_BUILD_OUTPUT_PATH "${GO_BUILD_OUTPUT_DIR}/${GO_BUILD_OUTPUT_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+		else()
+			set(GO_BUILD_OUTPUT_PATH "$ENV{METAFFI_HOME}/${GO_BUILD_OUTPUT_DIR}/${GO_BUILD_OUTPUT_NAME}${CMAKE_EXECUTABLE_SUFFIX}")
+		endif()
+		if(GO_BUILD_PACKAGE)
+			set(GO_BUILD_CMD COMMAND ${GOEXEC} build -o ${GO_BUILD_OUTPUT_PATH} ${GO_BUILD_PACKAGE})
+		else()
+			set(GO_BUILD_CMD COMMAND ${GOEXEC} build -o ${GO_BUILD_OUTPUT_PATH})
+		endif()
 	else()
-		set(GO_BUILD_OUTPUT_PATH "$ENV{METAFFI_HOME}/${GO_BUILD_OUTPUT_DIR}/${GO_BUILD_OUTPUT_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+		if(IS_ABSOLUTE "${GO_BUILD_OUTPUT_DIR}")
+			set(GO_BUILD_OUTPUT_PATH "${GO_BUILD_OUTPUT_DIR}/${GO_BUILD_OUTPUT_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+		else()
+			set(GO_BUILD_OUTPUT_PATH "$ENV{METAFFI_HOME}/${GO_BUILD_OUTPUT_DIR}/${GO_BUILD_OUTPUT_NAME}${CMAKE_SHARED_LIBRARY_SUFFIX}")
+		endif()
+		# c-shared requires exactly one main package; must specify PACKAGE (e.g. ./cmd/compiler_go_lib)
+		if(GO_BUILD_PACKAGE)
+			set(GO_BUILD_CMD COMMAND ${GOEXEC} build -buildmode=c-shared -gcflags=-shared -o ${GO_BUILD_OUTPUT_PATH} ${GO_BUILD_PACKAGE})
+		else()
+			set(GO_BUILD_CMD COMMAND ${GOEXEC} build -buildmode=c-shared -gcflags=-shared -o ${GO_BUILD_OUTPUT_PATH} .)
+		endif()
 	endif()
 	get_filename_component(GO_BUILD_OUTPUT_DIR_PATH "${GO_BUILD_OUTPUT_PATH}" DIRECTORY)
 
 	add_custom_command(
-			OUTPUT ${GO_BUILD_OUTPUT_PATH}
-			COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_BUILD_OUTPUT_DIR_PATH}
-			COMMAND ${GOEXEC} build -buildmode=c-shared -gcflags=-shared -o ${GO_BUILD_OUTPUT_PATH}
-			WORKING_DIRECTORY ${GO_BUILD_SOURCE_DIR}
-			DEPENDS ${GO_DEPENDENT_FILES}
-			COMMENT "Building go C-Shared dynamic library for target ${TARGET} to ${GO_BUILD_OUTPUT_PATH}"
-			USES_TERMINAL
+		OUTPUT ${GO_BUILD_OUTPUT_PATH}
+		COMMAND ${CMAKE_COMMAND} -E make_directory ${GO_BUILD_OUTPUT_DIR_PATH}
+		${GO_BUILD_CMD}
+		WORKING_DIRECTORY ${GO_BUILD_SOURCE_DIR}
+		DEPENDS ${GO_DEPENDENT_FILES}
+		COMMENT "Building Go (${GO_BUILD_OUTPUT_TYPE}) for ${TARGET}"
+		USES_TERMINAL
 	)
-
-	add_custom_target(${TARGET} ALL
-			DEPENDS ${GO_BUILD_OUTPUT_PATH}
-	)
+	add_custom_target(${TARGET} ALL DEPENDS ${GO_BUILD_OUTPUT_PATH})
 endmacro()
+
 
 # Add "go test" for the Target
 macro(add_go_test NAME)

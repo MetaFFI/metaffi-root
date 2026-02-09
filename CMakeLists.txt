@@ -75,8 +75,9 @@ add_subdirectory(sdk)
 add_subdirectory(metaffi-core)
 add_subdirectory(lang-plugin-python3)
 add_subdirectory(lang-plugin-jvm)
-#add_subdirectory(lang-plugin-go)
+add_subdirectory(lang-plugin-go)
 #add_subdirectory(lang-plugin-c)
 #add_subdirectory(metaffi-installer)
 
-add_custom_target(MetaFFI DEPENDS metaffi_sdk metaffi-core python3)
+add_custom_target(MetaFFI DEPENDS metaffi_sdk metaffi-core python3 jvm go)
+  
