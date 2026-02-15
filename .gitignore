@@ -39,6 +39,5 @@ metaffi-installer
 sdk
 go.work
 go.work.sum
-go.work
-go.work.sum
 .cache
+tests

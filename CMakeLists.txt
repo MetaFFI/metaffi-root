@@ -70,6 +70,13 @@ set(ENV{METAFFI_HOME} "${CMAKE_CURRENT_SOURCE_DIR}/output/${OS_NAME}/x64/${CMAKE
 verify_project_exists("${METAFFI_ROOT_DIR}/metaffi-core" "https://github.com/MetaFFI/metaffi-core.git")
 verify_project_exists("${METAFFI_ROOT_DIR}/sdk" "https://github.com/MetaFFI/plugin-sdk.git")
 
+verify_project_exists("${METAFFI_ROOT_DIR}/lang-plugin-python3" "https://github.com/MetaFFI/lang-plugin-python3.git")
+verify_project_exists("${METAFFI_ROOT_DIR}/lang-plugin-go" "https://github.com/MetaFFI/lang-plugin-go.git")
+verify_project_exists("${METAFFI_ROOT_DIR}/lang-plugin-jvm" "https://github.com/MetaFFI/lang-plugin-jvm.git")
+
+verify_project_exists("${METAFFI_ROOT_DIR}/tests" "https://github.com/MetaFFI/Tests.git")
+
+
 # add projects
 add_subdirectory(sdk)
 add_subdirectory(metaffi-core)
