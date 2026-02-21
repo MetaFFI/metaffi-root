@@ -77,6 +77,12 @@ macro(find_or_install_package package)
     find_package(${package} ${ARGN})
 
     if(NOT ${package}_FOUND)
+        set(_vcpkg_port "${package}")
+        if(_vcpkg_port STREQUAL "nlohmann_json")
+            set(_vcpkg_port "nlohmann-json")
+        endif()
+        string(TOLOWER "${_vcpkg_port}" _vcpkg_port)
+
         resolve_vcpkg_executable(VCPKG_EXECUTABLE)
         get_effective_vcpkg_root(_effective_vcpkg_root)
 
@@ -86,7 +92,7 @@ macro(find_or_install_package package)
         endif()
 
         set(_install_cmd ${VCPKG_EXECUTABLE})
-        list(APPEND _install_cmd ${_vcpkg_root_args} install ${package}:${_triplet})
+        list(APPEND _install_cmd ${_vcpkg_root_args} install ${_vcpkg_port}:${_triplet})
         execute_process(
             COMMAND ${_install_cmd}
             RESULT_VARIABLE exit_code
@@ -98,7 +104,7 @@ macro(find_or_install_package package)
             set(_vcpkg_install_output "${_vcpkg_install_stdout}\n${_vcpkg_install_stderr}")
             string(FIND "${_vcpkg_install_output}" "does not have a classic mode instance" _classic_mode_missing_pos)
             if(_classic_mode_missing_pos GREATER -1)
-                message(STATUS "vcpkg classic mode unavailable, retrying with manifest mode for ${package}:${_triplet}")
+                message(STATUS "vcpkg classic mode unavailable, retrying with manifest mode for ${_vcpkg_port}:${_triplet}")
 
                 set(_manifest_root "${CMAKE_BINARY_DIR}/_metaffi_vcpkg_manifest_${package}_${_triplet}")
                 file(MAKE_DIRECTORY "${_manifest_root}")
@@ -121,7 +127,7 @@ macro(find_or_install_package package)
                     "  \"name\": \"metaffi-${package}\",\n"
                     "  \"version-string\": \"0.0.0\",\n"
                     "  \"builtin-baseline\": \"${_vcpkg_builtin_baseline}\",\n"
-                    "  \"dependencies\": [\"${package}\"]\n"
+                    "  \"dependencies\": [\"${_vcpkg_port}\"]\n"
                     "}\n"
                 )
 
