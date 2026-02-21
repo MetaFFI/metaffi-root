@@ -1,10 +1,21 @@
 # PackageManagement.cmake
 
+function(get_effective_vcpkg_root OUT_VAR)
+	set(_root "")
+	if(DEFINED VCPKG_ROOT AND NOT "${VCPKG_ROOT}" STREQUAL "")
+		set(_root "${VCPKG_ROOT}")
+	elseif(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
+		set(_root "$ENV{VCPKG_ROOT}")
+	endif()
+	set(${OUT_VAR} "${_root}" PARENT_SCOPE)
+endfunction()
+
 function(resolve_vcpkg_executable OUT_VAR)
 	set(_vcpkg_from_env "")
-	if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
-		set(_candidate_exe "$ENV{VCPKG_ROOT}/vcpkg.exe")
-		set(_candidate_noext "$ENV{VCPKG_ROOT}/vcpkg")
+	get_effective_vcpkg_root(_effective_vcpkg_root)
+	if(NOT "${_effective_vcpkg_root}" STREQUAL "")
+		set(_candidate_exe "${_effective_vcpkg_root}/vcpkg.exe")
+		set(_candidate_noext "${_effective_vcpkg_root}/vcpkg")
 		if(EXISTS "${_candidate_exe}")
 			set(_vcpkg_from_env "${_candidate_exe}")
 		elseif(EXISTS "${_candidate_noext}")
@@ -16,8 +27,8 @@ function(resolve_vcpkg_executable OUT_VAR)
 		find_program(_vcpkg_from_env NAMES vcpkg vcpkg.exe)
 	endif()
 
-	if(NOT _vcpkg_from_env AND DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
-		find_program(_vcpkg_from_env NAMES vcpkg vcpkg.exe HINTS "$ENV{VCPKG_ROOT}")
+	if(NOT _vcpkg_from_env AND NOT "${_effective_vcpkg_root}" STREQUAL "")
+		find_program(_vcpkg_from_env NAMES vcpkg vcpkg.exe HINTS "${_effective_vcpkg_root}")
 	endif()
 
 	set(${OUT_VAR} "${_vcpkg_from_env}" PARENT_SCOPE)
@@ -67,10 +78,11 @@ macro(find_or_install_package package)
 
     if(NOT ${package}_FOUND)
         resolve_vcpkg_executable(VCPKG_EXECUTABLE)
+        get_effective_vcpkg_root(_effective_vcpkg_root)
 
         unset(_vcpkg_root_args)
-        if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
-            set(_vcpkg_root_args --vcpkg-root "$ENV{VCPKG_ROOT}")
+        if(NOT "${_effective_vcpkg_root}" STREQUAL "")
+            set(_vcpkg_root_args --vcpkg-root "${_effective_vcpkg_root}")
         endif()
 
         set(_install_cmd ${VCPKG_EXECUTABLE})
@@ -92,16 +104,16 @@ macro(find_or_install_package package)
                 file(MAKE_DIRECTORY "${_manifest_root}")
 
                 set(_vcpkg_builtin_baseline "")
-                if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
+                if(NOT "${_effective_vcpkg_root}" STREQUAL "")
                     execute_process(
-                        COMMAND git -C "$ENV{VCPKG_ROOT}" rev-parse HEAD
+                        COMMAND git -C "${_effective_vcpkg_root}" rev-parse HEAD
                         RESULT_VARIABLE _vcpkg_baseline_exit_code
                         OUTPUT_VARIABLE _vcpkg_builtin_baseline
                         OUTPUT_STRIP_TRAILING_WHITESPACE
                     )
                 endif()
                 if("${_vcpkg_builtin_baseline}" STREQUAL "")
-                    message(FATAL_ERROR "Failed to determine vcpkg builtin baseline from VCPKG_ROOT: $ENV{VCPKG_ROOT}")
+                    message(FATAL_ERROR "Failed to determine vcpkg builtin baseline from VCPKG_ROOT: ${_effective_vcpkg_root}")
                 endif()
 
                 file(WRITE "${_manifest_root}/vcpkg.json"
@@ -116,8 +128,8 @@ macro(find_or_install_package package)
                 unset(_manifest_install_root_args)
                 if(DEFINED VCPKG_INSTALLED_DIR AND NOT "${VCPKG_INSTALLED_DIR}" STREQUAL "")
                     set(_manifest_install_root_args --x-install-root "${VCPKG_INSTALLED_DIR}")
-                elseif(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
-                    set(_manifest_install_root_args --x-install-root "$ENV{VCPKG_ROOT}/installed")
+                elseif(NOT "${_effective_vcpkg_root}" STREQUAL "")
+                    set(_manifest_install_root_args --x-install-root "${_effective_vcpkg_root}/installed")
                 endif()
 
                 set(_manifest_cmd ${VCPKG_EXECUTABLE})
