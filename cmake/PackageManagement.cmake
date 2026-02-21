@@ -90,10 +90,25 @@ macro(find_or_install_package package)
 
                 set(_manifest_root "${CMAKE_BINARY_DIR}/_metaffi_vcpkg_manifest_${package}_${_triplet}")
                 file(MAKE_DIRECTORY "${_manifest_root}")
+
+                set(_vcpkg_builtin_baseline "")
+                if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
+                    execute_process(
+                        COMMAND git -C "$ENV{VCPKG_ROOT}" rev-parse HEAD
+                        RESULT_VARIABLE _vcpkg_baseline_exit_code
+                        OUTPUT_VARIABLE _vcpkg_builtin_baseline
+                        OUTPUT_STRIP_TRAILING_WHITESPACE
+                    )
+                endif()
+                if("${_vcpkg_builtin_baseline}" STREQUAL "")
+                    message(FATAL_ERROR "Failed to determine vcpkg builtin baseline from VCPKG_ROOT: $ENV{VCPKG_ROOT}")
+                endif()
+
                 file(WRITE "${_manifest_root}/vcpkg.json"
                     "{\n"
                     "  \"name\": \"metaffi-${package}\",\n"
                     "  \"version-string\": \"0.0.0\",\n"
+                    "  \"builtin-baseline\": \"${_vcpkg_builtin_baseline}\",\n"
                     "  \"dependencies\": [\"${package}\"]\n"
                     "}\n"
                 )
