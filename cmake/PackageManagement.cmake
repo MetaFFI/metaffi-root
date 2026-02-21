@@ -1,12 +1,28 @@
 # PackageManagement.cmake
 
+function(resolve_vcpkg_executable OUT_VAR)
+	set(_vcpkg_from_env "")
+	if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
+		set(_candidate "$ENV{VCPKG_ROOT}/vcpkg${CMAKE_EXECUTABLE_SUFFIX}")
+		if(EXISTS "${_candidate}")
+			set(_vcpkg_from_env "${_candidate}")
+		endif()
+	endif()
+
+	if(NOT _vcpkg_from_env)
+		find_program(_vcpkg_from_env NAMES vcpkg vcpkg.exe REQUIRED)
+	endif()
+
+	set(${OUT_VAR} "${_vcpkg_from_env}" PARENT_SCOPE)
+endfunction()
+
 # add_vcpkg macro
 macro(add_vcpkg_integration)
 	# Only set toolchain file if not already set
 	if(NOT DEFINED CMAKE_TOOLCHAIN_FILE)
 		set(CMAKE_TOOLCHAIN_FILE "$ENV{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake")
 	endif()
-	find_program(VCPKG_EXECUTABLE vcpkg)
+	resolve_vcpkg_executable(VCPKG_EXECUTABLE)
 	if(NOT VCPKG_EXECUTABLE)
 		message(FATAL_ERROR "vcpkg not found")
 	endif()
@@ -43,7 +59,7 @@ macro(find_or_install_package package)
     find_package(${package} ${ARGN})
 
     if(NOT ${package}_FOUND)
-        find_program(VCPKG_EXECUTABLE vcpkg REQUIRED)
+        resolve_vcpkg_executable(VCPKG_EXECUTABLE)
 
         unset(_vcpkg_root_args)
         if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
