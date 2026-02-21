@@ -48,7 +48,6 @@ include(Logging)
 find_or_install_package(spdlog)
 include(PackageManagement)
 include(JVM)
-include(CopyMatchingFiles)
 
 
 

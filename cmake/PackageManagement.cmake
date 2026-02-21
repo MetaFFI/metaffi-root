@@ -45,8 +45,13 @@ macro(find_or_install_package package)
     if(NOT ${package}_FOUND)
         find_program(VCPKG_EXECUTABLE vcpkg REQUIRED)
 
+        unset(_vcpkg_root_args)
+        if(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
+            set(_vcpkg_root_args --vcpkg-root "$ENV{VCPKG_ROOT}")
+        endif()
+
         execute_process(
-            COMMAND ${VCPKG_EXECUTABLE} install ${package}:${_triplet}
+            COMMAND ${VCPKG_EXECUTABLE} ${_vcpkg_root_args} install ${package}:${_triplet}
             RESULT_VARIABLE exit_code
         )
         if(exit_code)
