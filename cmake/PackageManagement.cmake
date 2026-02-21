@@ -73,12 +73,63 @@ macro(find_or_install_package package)
             set(_vcpkg_root_args --vcpkg-root "$ENV{VCPKG_ROOT}")
         endif()
 
+        set(_install_cmd ${VCPKG_EXECUTABLE})
+        list(APPEND _install_cmd ${_vcpkg_root_args} install ${package}:${_triplet})
         execute_process(
-            COMMAND ${VCPKG_EXECUTABLE} ${_vcpkg_root_args} install ${package}:${_triplet}
+            COMMAND ${_install_cmd}
             RESULT_VARIABLE exit_code
+            OUTPUT_VARIABLE _vcpkg_install_stdout
+            ERROR_VARIABLE _vcpkg_install_stderr
         )
+
         if(exit_code)
-            message(FATAL_ERROR "Failed to install ${package} for ${_triplet}")
+            set(_vcpkg_install_output "${_vcpkg_install_stdout}\n${_vcpkg_install_stderr}")
+            string(FIND "${_vcpkg_install_output}" "does not have a classic mode instance" _classic_mode_missing_pos)
+            if(_classic_mode_missing_pos GREATER -1)
+                message(STATUS "vcpkg classic mode unavailable, retrying with manifest mode for ${package}:${_triplet}")
+
+                set(_manifest_root "${CMAKE_BINARY_DIR}/_metaffi_vcpkg_manifest_${package}_${_triplet}")
+                file(MAKE_DIRECTORY "${_manifest_root}")
+                file(WRITE "${_manifest_root}/vcpkg.json"
+                    "{\n"
+                    "  \"name\": \"metaffi-${package}\",\n"
+                    "  \"version-string\": \"0.0.0\",\n"
+                    "  \"dependencies\": [\"${package}\"]\n"
+                    "}\n"
+                )
+
+                unset(_manifest_install_root_args)
+                if(DEFINED VCPKG_INSTALLED_DIR AND NOT "${VCPKG_INSTALLED_DIR}" STREQUAL "")
+                    set(_manifest_install_root_args --x-install-root "${VCPKG_INSTALLED_DIR}")
+                elseif(DEFINED ENV{VCPKG_ROOT} AND NOT "$ENV{VCPKG_ROOT}" STREQUAL "")
+                    set(_manifest_install_root_args --x-install-root "$ENV{VCPKG_ROOT}/installed")
+                endif()
+
+                set(_manifest_cmd ${VCPKG_EXECUTABLE})
+                list(APPEND _manifest_cmd
+                    ${_vcpkg_root_args}
+                    install
+                    --triplet ${_triplet}
+                    --x-manifest-root "${_manifest_root}"
+                    ${_manifest_install_root_args}
+                )
+                execute_process(
+                    COMMAND ${_manifest_cmd}
+                    RESULT_VARIABLE exit_code
+                    OUTPUT_VARIABLE _manifest_install_stdout
+                    ERROR_VARIABLE _manifest_install_stderr
+                )
+            endif()
+        endif()
+
+        if(exit_code)
+            message(FATAL_ERROR
+                "Failed to install ${package} for ${_triplet}\n"
+                "vcpkg stdout:\n${_vcpkg_install_stdout}\n"
+                "vcpkg stderr:\n${_vcpkg_install_stderr}\n"
+                "manifest stdout:\n${_manifest_install_stdout}\n"
+                "manifest stderr:\n${_manifest_install_stderr}"
+            )
         endif()
 
         # second try, now that vcpkg has installed it
