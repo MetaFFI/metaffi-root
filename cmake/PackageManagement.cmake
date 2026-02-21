@@ -78,10 +78,8 @@ macro(find_or_install_package package)
 
     if(NOT ${package}_FOUND)
         set(_vcpkg_port "${package}")
-        if(_vcpkg_port STREQUAL "nlohmann_json")
-            set(_vcpkg_port "nlohmann-json")
-        endif()
         string(TOLOWER "${_vcpkg_port}" _vcpkg_port)
+        string(REPLACE "_" "-" _vcpkg_port "${_vcpkg_port}")
 
         resolve_vcpkg_executable(VCPKG_EXECUTABLE)
         get_effective_vcpkg_root(_effective_vcpkg_root)
