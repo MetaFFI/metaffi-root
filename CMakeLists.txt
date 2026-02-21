@@ -48,6 +48,7 @@ include(Logging)
 find_or_install_package(spdlog)
 include(PackageManagement)
 include(JVM)
+include(CopyMatchingFiles)
 
 
 
@@ -83,6 +84,7 @@ add_subdirectory(metaffi-core)
 add_subdirectory(lang-plugin-python3)
 add_subdirectory(lang-plugin-jvm)
 add_subdirectory(lang-plugin-go)
+add_subdirectory(tests)
 #add_subdirectory(lang-plugin-c)
 #add_subdirectory(metaffi-installer)
 

@@ -229,11 +229,13 @@ macro(copy_vcpkg_runtime_dependencies TARGET_NAME COPYPATH)
 
 			# Copy only shared libraries (not static .a files) to $METAFFI_HOME
 			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-				COMMAND ${CMAKE_COMMAND} -E echo "Copying vcpkg runtime dependencies for ${TARGET_NAME} to $ENV{METAFFI_HOME}/${COPYPATH} ($<CONFIG> configuration)..."
+				COMMAND ${CMAKE_COMMAND} -E echo "Copying vcpkg runtime dependencies for ${TARGET_NAME} to $ENV{METAFFI_HOME}/${COPYPATH} - $<CONFIG> configuration..."
 				COMMAND ${CMAKE_COMMAND} -E make_directory "$ENV{METAFFI_HOME}/${COPYPATH}"
-				COMMAND ${CMAKE_COMMAND} -E copy_if_different
-					"$<IF:$<CONFIG:Debug>,${VCPKG_RUNTIME_DIR_DEBUG},${VCPKG_RUNTIME_DIR_RELEASE}>/${LIB_PATTERN}"
-					"$ENV{METAFFI_HOME}/${COPYPATH}/"
+				COMMAND ${CMAKE_COMMAND}
+					-DSRC_DIR="$<IF:$<CONFIG:Debug>,${VCPKG_RUNTIME_DIR_DEBUG},${VCPKG_RUNTIME_DIR_RELEASE}>"
+					-DDST_DIR="$ENV{METAFFI_HOME}/${COPYPATH}"
+					-DPATTERN="${LIB_PATTERN}"
+					-P "${CMAKE_SOURCE_DIR}/cmake/CopyMatchingFiles.cmake"
 				COMMENT "Copying vcpkg runtime dependencies for ${TARGET_NAME} to $ENV{METAFFI_HOME}"
 			)
 
