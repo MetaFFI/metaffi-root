@@ -1,12 +1,21 @@
 include(${CMAKE_CURRENT_LIST_DIR}/Utils.cmake)
 
-if(WIN32)
-	set(PYTHON_EXECUTABLE "$ENV{LOCALAPPDATA}/Programs/Python/Python311/python3.exe")
-	set(PYTHON_EXECUTABLE_ARG "")
-else()
-	set(PYTHON_EXECUTABLE "/usr/bin/python3.11")
-	set(PYTHON_EXECUTABLE_ARG "")
-endif()
+macro(get_python311_exec OUT_VAR)
+	if(WIN32)
+		find_program(_metaffi_python_exec NAMES python3.11.exe python3.exe python.exe python)
+	else()
+		find_program(_metaffi_python_exec NAMES python3.11 python3 python)
+	endif()
+
+	if(NOT _metaffi_python_exec)
+		message(FATAL_ERROR "Python executable not found (expected Python 3.11 on PATH).")
+	endif()
+
+	set(${OUT_VAR} "${_metaffi_python_exec}")
+endmacro()
+
+get_python311_exec(PYTHON_EXECUTABLE)
+set(PYTHON_EXECUTABLE_ARG "")
 
 
 macro(add_py_test NAME)
@@ -22,11 +31,7 @@ macro(add_py_test NAME)
 			"DEPENDENCIES" # multi-vals
 			${ARGN})
 
-	if(WIN32)
-		set(PYEXECFULLPATH "$ENV{LOCALAPPDATA}/Programs/Python/Python311/python3.exe")
-	else()
-		set(PYEXECFULLPATH "/usr/bin/python3.11")
-	endif()
+	get_python311_exec(PYEXECFULLPATH)
 
 	message(STATUS "Python executable: ${PYEXECFULLPATH}")
 
