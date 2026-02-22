@@ -261,13 +261,43 @@ function(find_or_install_pip_package PACKAGE_NAME)
 		message(FATAL_ERROR "find_or_install_pip_package requires PACKAGE_NAME")
 	endif()
 
-	find_program(PYTHON_EXECUTABLE python3 python)
-	if(NOT PYTHON_EXECUTABLE)
+	set(_pip_python_executable "")
+	if(DEFINED Python3_EXECUTABLE AND NOT "${Python3_EXECUTABLE}" STREQUAL "" AND EXISTS "${Python3_EXECUTABLE}")
+		set(_pip_python_executable "${Python3_EXECUTABLE}")
+	elseif(DEFINED PYTHON_EXECUTABLE AND NOT "${PYTHON_EXECUTABLE}" STREQUAL "" AND EXISTS "${PYTHON_EXECUTABLE}")
+		set(_pip_python_executable "${PYTHON_EXECUTABLE}")
+	else()
+		find_program(_pip_python_executable NAMES python3 python)
+	endif()
+
+	if(NOT _pip_python_executable)
 		message(FATAL_ERROR "Python executable not found for pip installation")
 	endif()
 
 	execute_process(
-		COMMAND ${PYTHON_EXECUTABLE} -m pip show ${PACKAGE_NAME}
+		COMMAND ${_pip_python_executable} -m pip --version
+		RESULT_VARIABLE pip_version_exit
+		OUTPUT_QUIET
+		ERROR_QUIET
+	)
+	if(pip_version_exit)
+		execute_process(
+			COMMAND ${_pip_python_executable} -m ensurepip --upgrade
+			RESULT_VARIABLE ensurepip_exit
+			OUTPUT_VARIABLE ensurepip_stdout
+			ERROR_VARIABLE ensurepip_stderr
+		)
+		if(ensurepip_exit)
+			message(FATAL_ERROR
+				"Failed to bootstrap pip for ${_pip_python_executable}\n"
+				"ensurepip stdout:\n${ensurepip_stdout}\n"
+				"ensurepip stderr:\n${ensurepip_stderr}"
+			)
+		endif()
+	endif()
+
+	execute_process(
+		COMMAND ${_pip_python_executable} -m pip show ${PACKAGE_NAME}
 		RESULT_VARIABLE pip_show_exit
 		OUTPUT_QUIET
 		ERROR_QUIET
@@ -275,11 +305,28 @@ function(find_or_install_pip_package PACKAGE_NAME)
 
 	if(pip_show_exit)
 		execute_process(
-			COMMAND ${PYTHON_EXECUTABLE} -m pip install ${PACKAGE_NAME} --upgrade
+			COMMAND ${_pip_python_executable} -m pip install ${PACKAGE_NAME} --upgrade
 			RESULT_VARIABLE pip_install_exit
+			OUTPUT_VARIABLE pip_install_stdout
+			ERROR_VARIABLE pip_install_stderr
 		)
+
+		if(pip_install_exit AND UNIX AND NOT APPLE)
+			execute_process(
+				COMMAND ${_pip_python_executable} -m pip install ${PACKAGE_NAME} --upgrade --break-system-packages
+				RESULT_VARIABLE pip_install_exit
+				OUTPUT_VARIABLE pip_install_stdout
+				ERROR_VARIABLE pip_install_stderr
+			)
+		endif()
+
 		if(pip_install_exit)
-			message(FATAL_ERROR "Failed to install pip package: ${PACKAGE_NAME}")
+			message(FATAL_ERROR
+				"Failed to install pip package: ${PACKAGE_NAME}\n"
+				"python executable: ${_pip_python_executable}\n"
+				"pip stdout:\n${pip_install_stdout}\n"
+				"pip stderr:\n${pip_install_stderr}"
+			)
 		endif()
 	endif()
 endfunction()
