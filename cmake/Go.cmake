@@ -92,7 +92,22 @@ macro(add_go_test NAME)
 		set(add_go_test_WORKING_DIRECTORY .)
 	endif()
 
+	# Go CGO tests include headers/sources from METAFFI_HOME/include and sdk headers.
+	# Make these include roots available by default for all go test invocations.
+	set(_go_test_cgo_flags "-I$ENV{METAFFI_HOME} -I$ENV{METAFFI_HOME}/include -I$ENV{METAFFI_SOURCE_ROOT}/sdk")
+	if(NOT "$ENV{CGO_CFLAGS}" STREQUAL "")
+		set(_go_test_cgo_flags "${_go_test_cgo_flags} $ENV{CGO_CFLAGS}")
+	endif()
+	if(NOT "$ENV{CGO_CPPFLAGS}" STREQUAL "")
+		set(_go_test_cppflags "${_go_test_cgo_flags} $ENV{CGO_CPPFLAGS}")
+	else()
+		set(_go_test_cppflags "${_go_test_cgo_flags}")
+	endif()
+
 	add_test(NAME "(go test) ${NAME}"
-			COMMAND ${GOEXEC} test -v
+			COMMAND ${CMAKE_COMMAND} -E env
+			"CGO_CFLAGS=${_go_test_cgo_flags}"
+			"CGO_CPPFLAGS=${_go_test_cppflags}"
+			${GOEXEC} test -v
 			WORKING_DIRECTORY ${add_go_test_WORKING_DIRECTORY})
 endmacro()
