@@ -2,6 +2,28 @@ find_package(Java REQUIRED)
 find_package(JNI REQUIRED)
 include(UseJava)
 
+function(get_jvm_dll_search_paths OUT_VAR)
+	set(_paths "")
+
+	if(WIN32)
+		if(Java_JAVA_EXECUTABLE)
+			get_filename_component(_java_bin_dir "${Java_JAVA_EXECUTABLE}" DIRECTORY)
+			list(APPEND _paths "${_java_bin_dir}" "${_java_bin_dir}/server")
+		endif()
+
+		if(DEFINED ENV{JAVA_HOME} AND NOT "$ENV{JAVA_HOME}" STREQUAL "")
+			list(APPEND _paths
+				"$ENV{JAVA_HOME}/bin"
+				"$ENV{JAVA_HOME}/bin/server"
+				"$ENV{JAVA_HOME}/jre/bin/server"
+			)
+		endif()
+	endif()
+
+	list(REMOVE_DUPLICATES _paths)
+	set(${OUT_VAR} "${_paths}" PARENT_SCOPE)
+endfunction()
+
 if(NOT DEFINED METAFFI_JAVA_RELEASE)
 	set(METAFFI_JAVA_RELEASE 11)
 endif()

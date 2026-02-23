@@ -16,6 +16,12 @@ if(NOT DEFINED ENV{METAFFI_SOURCE_ROOT} OR "$ENV{METAFFI_SOURCE_ROOT}" STREQUAL 
   )
 endif()
 
+# Normalize environment paths to CMake-style separators to avoid escaping issues on Windows.
+file(TO_CMAKE_PATH "$ENV{METAFFI_HOME}" METAFFI_HOME_NORMALIZED)
+set(ENV{METAFFI_HOME} "${METAFFI_HOME_NORMALIZED}")
+file(TO_CMAKE_PATH "$ENV{METAFFI_SOURCE_ROOT}" METAFFI_SOURCE_ROOT_NORMALIZED)
+set(ENV{METAFFI_SOURCE_ROOT} "${METAFFI_SOURCE_ROOT_NORMALIZED}")
+
 
 # set the ./cmake path (as absolute path) to a variable
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
@@ -62,9 +68,6 @@ enable_testing()
 
 # set output directory
 set(METAFFI_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-
-# set the output directory where binaries are copied to
-set(ENV{METAFFI_HOME} "${CMAKE_CURRENT_SOURCE_DIR}/output/${OS_NAME}/x64/${CMAKE_BUILD_TYPE}/")
 
 # verify the projects exists 
 verify_project_exists("${METAFFI_ROOT_DIR}/metaffi-core" "https://github.com/MetaFFI/metaffi-core.git")
