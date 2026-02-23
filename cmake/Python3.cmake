@@ -55,8 +55,17 @@ macro(add_py_test NAME)
 
 
 	if(EXISTS ${PYEXECFULLPATH})
+		if(WIN32)
+			set(_metaffi_path_sep ";")
+		else()
+			set(_metaffi_path_sep ":")
+		endif()
+		set(_metaffi_test_path "$ENV{METAFFI_HOME}${_metaffi_path_sep}$ENV{PATH}")
+
 		add_test(NAME "(python3 test) ${NAME}"
-				COMMAND ${PYEXECFULLPATH} -m unittest ${_py_test_module}
+				COMMAND ${CMAKE_COMMAND} -E env
+				"PATH=${_metaffi_test_path}"
+				${PYEXECFULLPATH} -m unittest ${_py_test_module}
 				WORKING_DIRECTORY ${add_py_test_WORKING_DIRECTORY})
 	else()
 		message(WARNING "Python executable not found at ${PYEXECFULLPATH}. Test ${NAME} not added.")

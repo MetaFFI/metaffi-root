@@ -104,8 +104,15 @@ macro(add_go_test NAME)
 		set(_go_test_cppflags "${_go_test_cgo_flags}")
 	endif()
 
+	if(WIN32)
+		set(_go_test_path "$ENV{METAFFI_HOME};$ENV{PATH}")
+	else()
+		set(_go_test_path "$ENV{METAFFI_HOME}:$ENV{PATH}")
+	endif()
+
 	add_test(NAME "(go test) ${NAME}"
 			COMMAND ${CMAKE_COMMAND} -E env
+			"PATH=${_go_test_path}"
 			"CGO_CFLAGS=${_go_test_cgo_flags}"
 			"CGO_CPPFLAGS=${_go_test_cppflags}"
 			${GOEXEC} test -v
