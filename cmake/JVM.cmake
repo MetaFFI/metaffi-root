@@ -265,6 +265,11 @@ macro(add_junit_test TARGET_NAME)
 		string(JOIN ":" CLASSPATH_STR ${ADD_JUNIT_CLASSPATH})
 	endif()
 
+	# Keep JAVA_HOME consistent with the java executable used by this test.
+	get_filename_component(_METAFFI_JAVA_BIN_DIR "${Java_JAVA_EXECUTABLE}" DIRECTORY)
+	get_filename_component(_METAFFI_JAVA_HOME "${_METAFFI_JAVA_BIN_DIR}" DIRECTORY)
+	set(_METAFFI_JAVA_TEST_ENV "JAVA_HOME=${_METAFFI_JAVA_HOME}")
+
 	# Create output directory if needed (at configure time for CTest)
 	file(MAKE_DIRECTORY ${ADD_JUNIT_OUTPUT_DIR})
 
@@ -280,6 +285,7 @@ macro(add_junit_test TARGET_NAME)
 	# Set test properties and dependencies
 	set_tests_properties("(junit test) ${TARGET_NAME}" PROPERTIES
 		LABELS "junit"
+		ENVIRONMENT "${_METAFFI_JAVA_TEST_ENV}"
 	)
 	
 	# Set test dependencies if provided
@@ -292,7 +298,7 @@ macro(add_junit_test TARGET_NAME)
 	# Create custom command to run tests (for build-time execution)
 	add_custom_command(
 		OUTPUT ${ADD_JUNIT_OUTPUT_DIR}/.tests_run
-		COMMAND ${Java_JAVA_EXECUTABLE} -Dtestdata.classes.dir=${CMAKE_CURRENT_BINARY_DIR}/test/com/metaffi/idl/testdata -cp "${CLASSPATH_STR}" org.junit.runner.JUnitCore ${ADD_JUNIT_TEST_CLASSES}
+		COMMAND ${CMAKE_COMMAND} -E env "${_METAFFI_JAVA_TEST_ENV}" ${Java_JAVA_EXECUTABLE} -Dtestdata.classes.dir=${CMAKE_CURRENT_BINARY_DIR}/test/com/metaffi/idl/testdata -cp "${CLASSPATH_STR}" org.junit.runner.JUnitCore ${ADD_JUNIT_TEST_CLASSES}
 		DEPENDS ${ADD_JUNIT_DEPENDS}
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 		COMMENT ${ADD_JUNIT_COMMENT}
@@ -338,6 +344,11 @@ macro(add_java_main_test TARGET_NAME)
 		string(JOIN ":" CLASSPATH_STR ${ADD_JAVA_MAIN_CLASSPATH})
 	endif()
 
+	# Keep JAVA_HOME consistent with the java executable used by this test.
+	get_filename_component(_METAFFI_JAVA_BIN_DIR "${Java_JAVA_EXECUTABLE}" DIRECTORY)
+	get_filename_component(_METAFFI_JAVA_HOME "${_METAFFI_JAVA_BIN_DIR}" DIRECTORY)
+	set(_METAFFI_JAVA_TEST_ENV "JAVA_HOME=${_METAFFI_JAVA_HOME}")
+
 	# Create output directory if needed
 	file(MAKE_DIRECTORY ${ADD_JAVA_MAIN_OUTPUT_DIR})
 
@@ -357,6 +368,7 @@ macro(add_java_main_test TARGET_NAME)
 
 	set_tests_properties("(java main test) ${TARGET_NAME}" PROPERTIES
 		LABELS "java"
+		ENVIRONMENT "${_METAFFI_JAVA_TEST_ENV}"
 	)
 
 	# Set test dependencies if provided
@@ -369,7 +381,7 @@ macro(add_java_main_test TARGET_NAME)
 	# Create custom command to run tests (for build-time execution)
 	add_custom_command(
 		OUTPUT ${ADD_JAVA_MAIN_OUTPUT_DIR}/.tests_run
-		COMMAND ${Java_JAVA_EXECUTABLE} -cp "${CLASSPATH_STR}" ${ADD_JAVA_MAIN_TEST_CLASS}
+		COMMAND ${CMAKE_COMMAND} -E env "${_METAFFI_JAVA_TEST_ENV}" ${Java_JAVA_EXECUTABLE} -cp "${CLASSPATH_STR}" ${ADD_JAVA_MAIN_TEST_CLASS}
 		DEPENDS ${ADD_JAVA_MAIN_DEPENDS}
 		WORKING_DIRECTORY ${JAVA_MAIN_WORKDIR}
 		COMMENT ${ADD_JAVA_MAIN_COMMENT}
