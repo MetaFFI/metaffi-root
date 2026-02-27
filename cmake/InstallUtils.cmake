@@ -1,30 +1,4 @@
 
-macro(install_boost BOOST_LIBS)
-	foreach(LIB ${ARGV})
-		# Find the required Boost component
-		find_package(Boost REQUIRED COMPONENTS ${LIB})
-
-		# Check if the library is header-only
-		get_target_property(BOOST_LIB_LOCATION Boost::${LIB} LOCATION)
-		if(BOOST_LIB_LOCATION)
-			# Install the specific Boost library
-			if(WIN32)
-				# On Windows, the Boost libraries are installed in the bin directory
-				install(FILES ${BOOST_LIB_LOCATION} DESTINATION bin)
-			else()
-				# On Unix-like systems, the Boost libraries are installed in the lib directory
-				install(FILES ${BOOST_LIB_LOCATION} DESTINATION lib)
-			endif()
-
-			# Print the message during the installation phase
-			install(CODE "message(STATUS \"Installing Boost ${LIB}: ${BOOST_LIB_LOCATION}\")")
-		else()
-			# Print a message indicating that the library is header-only
-			message(STATUS "Boost ${LIB} is a header-only library and doesn't need to be installed.")
-		endif()
-	endforeach()
-endmacro()
-
 macro(install_python3)
 	# Get the location of the Python3 library
 	get_target_property(PYTHON3_LIB_LOCATION Python3::Python IMPORTED_LOCATION_RELEASE)

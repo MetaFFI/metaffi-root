@@ -108,36 +108,6 @@ macro(c_cpp_exe TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
                         COMMAND ${CMAKE_COMMAND} -E echo "Copied $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
         )
 
-	if(NOT ARG_SKIP_DEPS)
-		# Conditional logic based on OS
-		if(WIN32)
-			# Windows: USE TARGET_RUNTIME_DLLS
-			# Note: If there are no runtime DLLs, this command will print the message but effectively do nothing
-			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-					COMMAND ${CMAKE_COMMAND} -E echo "Going to Copy dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}. Deps: $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>"
-					COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${TARGET_NAME}> ${CPP_COPY_DEST}
-					COMMAND ${CMAKE_COMMAND} -E echo "Finished processing dependencies of $<TARGET_FILE:${TARGET_NAME}>"
-					COMMAND_EXPAND_LISTS
-			)
-		elseif(UNIX AND NOT APPLE)
-			# Linux: Use ldd to find and copy shared libraries
-			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-					COMMAND ${CMAKE_COMMAND} -E echo "Finding dependencies of $<TARGET_FILE:${TARGET_NAME}>:"
-					COMMAND ldd $<TARGET_FILE:${TARGET_NAME}> | tee ldd_output.txt
-					COMMAND ${CMAKE_COMMAND} -E echo "ldd output:"
-					COMMAND ${CMAKE_COMMAND} -E cat ldd_output.txt
-					COMMAND ${CMAKE_COMMAND} -E echo "Detected dependencies:"
-					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} echo {}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copying dependencies:"
-					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} ${CMAKE_COMMAND} -E copy_if_different {} ${CPP_COPY_DEST}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
-			)
-		else()
-			# Unsupported OS: Fail the configuration
-			message(FATAL_ERROR "Unsupported OS: This macro only supports Windows and Linux.")
-		endif()
-	endif()
-
 	# Auto-link spdlog for centralized logging
 	if(spdlog_FOUND)
 		target_link_libraries(${TARGET_NAME} PRIVATE spdlog::spdlog)
@@ -190,34 +160,6 @@ macro(c_cpp_shared_lib TARGET_NAME SOURCE INCLUDE LIBRARIES COPYPATH)
 		COMMAND ${CMAKE_COMMAND} -E echo "Copied $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
 		COMMAND_EXPAND_LISTS
 	)
-
-	if(NOT ARG_SKIP_DEPS)
-		# Check if there are any runtime DLLs to copy
-		# copy its dependencies to the same directory. Use TARGET_RUNTIME_DLLS expression to get the list of dependencies
-		if(WIN32)
-			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-					COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_RUNTIME_DLLS:${TARGET_NAME}> ${CPP_COPY_DEST}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
-					COMMAND_EXPAND_LISTS
-			)
-		elseif(UNIX AND NOT APPLE)
-			# Linux: Use ldd to find and copy shared libraries
-			add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-					COMMAND ${CMAKE_COMMAND} -E echo "Finding dependencies of $<TARGET_FILE:${TARGET_NAME}>:"
-					COMMAND ldd $<TARGET_FILE:${TARGET_NAME}> | tee ldd_output.txt
-					COMMAND ${CMAKE_COMMAND} -E echo "ldd output:"
-					COMMAND ${CMAKE_COMMAND} -E cat ldd_output.txt
-					COMMAND ${CMAKE_COMMAND} -E echo "Detected dependencies:"
-					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} echo {}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copying dependencies:"
-					COMMAND grep -oP '/[^ ]+' ldd_output.txt | xargs -I {} ${CMAKE_COMMAND} -E copy_if_different {} ${CPP_COPY_DEST}
-					COMMAND ${CMAKE_COMMAND} -E echo "Copied dependencies of $<TARGET_FILE:${TARGET_NAME}> to ${CPP_COPY_DEST}"
-			)
-		else()
-			# Unsupported OS: Fail the configuration
-			message(FATAL_ERROR "Unsupported OS: This macro only supports Windows and Linux.")
-		endif()
-	endif()
 
 	# Auto-link spdlog for centralized logging
 	if(spdlog_FOUND)
