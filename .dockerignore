@@ -1,0 +1,39 @@
+# Version control
+.git
+**/.git
+.gitmodules
+
+# Reserved Windows device name - breaks hcsshim layer import
+sdk/runtime_manager/jvm/nul
+
+# CMake build trees (2.1 GB total)
+cmake-build-debug
+cmake-build-debug-wsl-2404
+cmake-build-relwithdebinfo
+cmake-build-relwithdebinfo-wsl-2404
+
+# Compiled output dir (plugin zips are in containers/ instead)
+output
+
+# Installer build outputs
+metaffi-installer/installers_output
+
+# Python bytecode
+**/__pycache__
+**/*.pyc
+**/*.pyo
+
+# Prior test results (re-generated during build)
+tests/results/**/*.json
+
+# Maven compiled artifacts in test trees (63+ MB)
+tests/**/target
+
+# Go vendor dirs
+tests/**/vendor
+
+# IDE/OS
+.idea
+**/.DS_Store
+**/Thumbs.db
+*.code-workspace
