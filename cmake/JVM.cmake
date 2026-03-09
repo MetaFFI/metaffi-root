@@ -227,7 +227,7 @@ macro(compile_java TARGET_NAME)
 		VERBATIM
 	)
 
-	add_custom_target(${TARGET_NAME}
+	add_custom_target(${TARGET_NAME} ALL
 		DEPENDS ${COMPILE_JAVA_OUTPUT_DIR}/.${TARGET_NAME}.compiled
 	)
 

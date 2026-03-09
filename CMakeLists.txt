@@ -76,6 +76,7 @@ verify_project_exists("${METAFFI_ROOT_DIR}/sdk" "https://github.com/MetaFFI/plug
 verify_project_exists("${METAFFI_ROOT_DIR}/lang-plugin-python3" "https://github.com/MetaFFI/lang-plugin-python3.git")
 verify_project_exists("${METAFFI_ROOT_DIR}/lang-plugin-go" "https://github.com/MetaFFI/lang-plugin-go.git")
 verify_project_exists("${METAFFI_ROOT_DIR}/lang-plugin-jvm" "https://github.com/MetaFFI/lang-plugin-jvm.git")
+verify_project_exists("${METAFFI_ROOT_DIR}/lang-plugin-cpp" "https://github.com/MetaFFI/lang-plugin-cpp.git")
 
 verify_project_exists("${METAFFI_ROOT_DIR}/tests" "https://github.com/MetaFFI/Tests.git")
 
@@ -86,9 +87,11 @@ add_subdirectory(metaffi-core)
 add_subdirectory(lang-plugin-python3)
 add_subdirectory(lang-plugin-jvm)
 add_subdirectory(lang-plugin-go)
+add_subdirectory(lang-plugin-cpp)
 add_subdirectory(tests)
 #add_subdirectory(lang-plugin-c)
 #add_subdirectory(metaffi-installer)
 
-add_custom_target(MetaFFI DEPENDS metaffi_sdk metaffi-core python3 jvm go)
+add_custom_target(MetaFFI)
+add_dependencies(MetaFFI metaffi_sdk metaffi-core python3 jvm go cpp)
   
