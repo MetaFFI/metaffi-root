@@ -3,6 +3,34 @@ set(CMAKE_SHARED_LIBRARY_PREFIX "")
 
 # -----------------------------------------------------------------------------------------------
 
+# Compute a compiler-ABI suffix for the C++ runtime plugin DLL.
+# Sets CPP_ABI_SUFFIX in the caller's scope (e.g. "msvc14d", "gcc13", "clang17d").
+function(compute_cpp_abi_suffix)
+    # Compiler family
+    if(MSVC)
+        math(EXPR _abi_family "${MSVC_TOOLSET_VERSION} / 10")
+        set(_suffix "msvc${_abi_family}")
+    elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+        string(REGEX MATCH "^[0-9]+" _major "${CMAKE_CXX_COMPILER_VERSION}")
+        set(_suffix "gcc${_major}")
+    elseif(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+        string(REGEX MATCH "^[0-9]+" _major "${CMAKE_CXX_COMPILER_VERSION}")
+        set(_suffix "clang${_major}")
+    else()
+        message(FATAL_ERROR "Unsupported compiler for CPP ABI suffix: ${CMAKE_CXX_COMPILER_ID}")
+    endif()
+
+    # Debug suffix
+    string(TOUPPER "${CMAKE_BUILD_TYPE}" _bt)
+    if(_bt STREQUAL "DEBUG")
+        set(_suffix "${_suffix}d")
+    endif()
+
+    set(CPP_ABI_SUFFIX "${_suffix}" PARENT_SCOPE)
+endfunction()
+
+# -----------------------------------------------------------------------------------------------
+
 macro(collect_c_cpp_files_recursively paths prefix)
 
 	set(${prefix}_include_dir ${CMAKE_CURRENT_LIST_DIR})

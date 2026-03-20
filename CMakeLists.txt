@@ -93,5 +93,5 @@ add_subdirectory(tests)
 #add_subdirectory(metaffi-installer)
 
 add_custom_target(MetaFFI)
-add_dependencies(MetaFFI metaffi_sdk metaffi-core python3 jvm go cpp)
+add_dependencies(MetaFFI metaffi_sdk metaffi-core python3 jvm go cpp metaffi_tests)
   
